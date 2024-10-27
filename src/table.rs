@@ -4,7 +4,8 @@ use arrow::{
     array::{Array, ArrayData, ArrayRef, RecordBatch},
     util::pretty,
 };
-use arrow_schema::{DataType, Field, Schema};
+use arrow_schema::{DataType, Field, Schema, SchemaRef};
+use datafusion::logical_expr::TableSource;
 
 use crate::{
     column::Column,
@@ -118,6 +119,16 @@ impl Into<RecordBatch> for Table<'_> {
             .map(|c| c.data.to_owned())
             .collect::<Vec<_>>();
         RecordBatch::try_new(Arc::new(self.schema), columns).unwrap()
+    }
+}
+
+impl TableSource for Table<'static> {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        Arc::new(self.schema.to_owned())
     }
 }
 

@@ -1,17 +1,31 @@
+use std::{fmt::Debug, sync::Arc};
+
+use arrow::array::RecordBatch;
 use dashmap::{
     mapref::one::{Ref, RefMut},
     DashMap,
 };
+use datafusion::{datasource::MemTable, prelude::SessionContext};
 
 use crate::{
     error::{DbError, Result},
     table::Table,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Database<'a> {
     pub name: &'a str,
     pub tables: DashMap<&'a str, Table<'a>>,
+    pub ctx: SessionContext,
+}
+
+impl Debug for Database<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Database")
+            .field("name", &self.name)
+            .field("tables", &self.tables)
+            .finish()
+    }
 }
 
 impl<'a> Database<'a> {
@@ -19,6 +33,7 @@ impl<'a> Database<'a> {
         Database {
             name,
             tables: DashMap::new(),
+            ctx: SessionContext::new(),
         }
     }
 
@@ -26,6 +41,15 @@ impl<'a> Database<'a> {
         if self.tables.contains_key(table.name) {
             return Err(DbError::TableAlreadyExists(table.name.into()));
         }
+
+        let table_ref = self.tables.get(table.name).unwrap();
+        let schema = Arc::new(table_ref.schema.to_owned());
+        let batch: RecordBatch = table_ref.to_owned().into();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+
+        self.ctx
+            .register_table(table.name, Arc::new(provider))
+            .unwrap();
 
         self.tables.insert(table.name, table);
 
