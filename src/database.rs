@@ -38,20 +38,28 @@ impl<'a> Database<'a> {
     }
 
     pub fn add_table(&mut self, table: Table<'a>) -> Result<()> {
-        if self.tables.contains_key(table.name) {
-            return Err(DbError::TableAlreadyExists(table.name.into()));
+        let table_name = table.name;
+
+        if self.tables.contains_key(table_name) {
+            return Err(DbError::TableAlreadyExists(table_name.into()));
         }
 
-        let table_ref = self.tables.get(table.name).unwrap();
+        self.tables.insert(table_name, table);
+
+        Ok(())
+    }
+
+    pub fn add_table_context(&mut self, table: Table<'a>) -> Result<()> {
+        let table_name = table.name;
+
+        let table_ref = table.to_owned();
         let schema = Arc::new(table_ref.schema.to_owned());
-        let batch: RecordBatch = table_ref.to_owned().into();
+        let batch: RecordBatch = table_ref.into();
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
 
         self.ctx
-            .register_table(table.name, Arc::new(provider))
+            .register_table(table_name, Arc::new(provider))
             .unwrap();
-
-        self.tables.insert(table.name, table);
 
         Ok(())
     }

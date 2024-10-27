@@ -214,6 +214,7 @@ dependencies = [
  "datafusion",
  "serde",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

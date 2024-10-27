@@ -118,6 +118,7 @@ impl Into<RecordBatch> for Table<'_> {
             .iter()
             .map(|c| c.data.to_owned())
             .collect::<Vec<_>>();
+
         RecordBatch::try_new(Arc::new(self.schema), columns).unwrap()
     }
 }
