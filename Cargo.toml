@@ -1,0 +1,11 @@
+[package]
+name = "arrow-db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arrow = { version = "53.2.0", features = ["prettyprint"] }
+arrow-schema = "53.2.0"
+dashmap = "6.1.0"
+serde = { version = "1.0.213", features = ["derive"] }
+thiserror = "1.0.65"
