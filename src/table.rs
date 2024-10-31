@@ -26,18 +26,6 @@ impl<'a> Table<'a> {
     }
 }
 
-// impl Into<RecordBatch> for Table<'_> {
-//     fn into(self) -> RecordBatch {
-//         let columns = self
-//             .columns
-//             .iter()
-//             .map(|c| c.data.to_owned())
-//             .collect::<Vec<_>>();
-
-//         RecordBatch::try_new(Arc::new(self.schema), columns).unwrap()
-//     }
-// }
-
 impl TableSource for Table<'static> {
     fn as_any(&self) -> &dyn std::any::Any {
         self
@@ -73,7 +61,7 @@ pub mod tests {
             .unwrap();
 
         table
-            .insert_column_data_at::<Int32Array>(0, 2, Int32Array::from(vec![4]).into())
+            .insert_column_data::<Int32Array>(0, 2, Int32Array::from(vec![4]).into())
             .unwrap();
 
         table

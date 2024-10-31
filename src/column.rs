@@ -95,43 +95,43 @@ impl<'a> Table<'a> {
         let column = self.record_batch.column(column_index);
         let end = column.to_data().len();
 
-        self.insert_column_data_at::<T>(column_index, end, data)
+        self.insert_column_data::<T>(column_index, end, data)
     }
 
     /// Insert ArrayData to a column in the table at a specified row index.
-    pub fn insert_column_data_at<T: From<ArrayData> + Array + 'static>(
+    pub fn insert_column_data<T: From<ArrayData> + Array + 'static>(
         &mut self,
         column_index: usize,
         row_index: usize,
         data: ArrayData,
     ) -> Result<()> {
         let set_kind = SetKind::InsertAt(data);
-        self.set_column_data_at::<T>(column_index, row_index, set_kind)
+        self.set_column_data::<T>(column_index, row_index, set_kind)
     }
 
     /// Update ArrayData to a column in the table at a specified row index.
-    pub fn update_column_data_at<T: From<ArrayData> + Array + 'static>(
+    pub fn update_column_data<T: From<ArrayData> + Array + 'static>(
         &mut self,
         column_index: usize,
         row_index: usize,
         data: ArrayData,
     ) -> Result<()> {
         let set_kind = SetKind::Update(data);
-        self.set_column_data_at::<T>(column_index, row_index, set_kind)
+        self.set_column_data::<T>(column_index, row_index, set_kind)
     }
 
     /// Remove a column in the table at a specified row index.
-    pub fn remove_column_data_at<T: From<ArrayData> + Array + 'static>(
+    pub fn remove_column_data<T: From<ArrayData> + Array + 'static>(
         &mut self,
         column_index: usize,
         row_index: usize,
     ) -> Result<()> {
         let set_kind = SetKind::Remove;
-        self.set_column_data_at::<T>(column_index, row_index, set_kind)
+        self.set_column_data::<T>(column_index, row_index, set_kind)
     }
 
     /// Set ArrayData column in the table at a specified row index.
-    pub fn set_column_data_at<T: From<ArrayData> + Array + 'static>(
+    pub fn set_column_data<T: From<ArrayData> + Array + 'static>(
         &mut self,
         column_index: usize,
         row_index: usize,
@@ -241,12 +241,12 @@ pub mod tests {
 
         // insert data at a specific index in the column
         table
-            .insert_column_data_at::<Int32Array>(0, 2, Int32Array::from(vec![4]).into())
+            .insert_column_data::<Int32Array>(0, 2, Int32Array::from(vec![4]).into())
             .unwrap();
 
         // update data at a specific index in the column
         table
-            .update_column_data_at::<Int32Array>(0, 1, Int32Array::from(vec![5]).into())
+            .update_column_data::<Int32Array>(0, 1, Int32Array::from(vec![5]).into())
             .unwrap();
 
         table.print_column(0);
@@ -256,7 +256,7 @@ pub mod tests {
         assert_eq!(expected, data);
 
         // remove data at a specific index in the column
-        table.remove_column_data_at::<Int32Array>(0, 1).unwrap();
+        table.remove_column_data::<Int32Array>(0, 1).unwrap();
         let expected = Int32Array::from(vec![1, 4, 3]).to_data();
         let data = table.record_batch.column(0).to_data();
         assert_eq!(expected, data);
