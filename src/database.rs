@@ -1,11 +1,10 @@
 use std::{fmt::Debug, sync::Arc};
 
-use arrow::array::RecordBatch;
 use dashmap::{
     mapref::one::{Ref, RefMut},
     DashMap,
 };
-use datafusion::{datasource::MemTable, prelude::SessionContext};
+use datafusion::{catalog::TableProvider, datasource::MemTable, prelude::SessionContext};
 
 use crate::{
     error::{DbError, Result},
@@ -51,17 +50,22 @@ impl<'a> Database<'a> {
 
     pub fn add_table_context(&mut self, table: Table<'a>) -> Result<()> {
         let table_name = table.name;
-
-        let table_ref = table.to_owned();
-        let schema = Arc::new(table_ref.schema.to_owned());
-        let batch: RecordBatch = table_ref.into();
-        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        let schema = table.record_batch.schema();
+        let provider = MemTable::try_new(schema, vec![vec![table.record_batch]]).unwrap();
 
         self.ctx
             .register_table(table_name, Arc::new(provider))
             .unwrap();
 
         Ok(())
+    }
+
+    pub fn remove_table_context(&mut self, table: Table<'a>) -> Result<Arc<dyn TableProvider>> {
+        let table_name = table.name;
+
+        let provider = self.ctx.deregister_table(table_name).unwrap().unwrap();
+
+        Ok(provider)
     }
 
     pub fn get_table(&self, name: &str) -> Result<Ref<'a, &str, Table>> {
@@ -76,6 +80,7 @@ impl<'a> Database<'a> {
             .ok_or_else(|| DbError::TableNotFound(name.into()))
     }
 
+    #[cfg(test)]
     pub fn print(&self) {
         for table in self.tables.iter() {
             table.value().print();
@@ -105,8 +110,6 @@ macro_rules! get_mut_table {
 
 #[cfg(test)]
 pub mod tests {
-    use arrow::array::{Int32Array, StringArray};
-    use arrow_schema::DataType;
 
     use super::*;
 
@@ -132,47 +135,5 @@ pub mod tests {
         assert_eq!(table_ref, table);
 
         assert!(database.tables.get("non_existent_table").is_none());
-    }
-
-    #[test]
-    fn test_database_columns() {
-        let (database, table) = create_database();
-
-        let name = table.name;
-        get_mut_table!(database, name)
-            .unwrap()
-            .add_column(0, "id", DataType::Int32)
-            .unwrap();
-
-        get_mut_table!(database, name)
-            .unwrap()
-            .append_column_data::<Int32Array>(0, Int32Array::from(vec![1, 2]).into())
-            .unwrap();
-
-        get_mut_table!(database, name)
-            .unwrap()
-            .append_column_data::<Int32Array>(0, Int32Array::from(vec![3]).into())
-            .unwrap();
-
-        get_mut_table!(database, name)
-            .unwrap()
-            .insert_column_data_at::<Int32Array>(0, 2, Int32Array::from(vec![4]).into())
-            .unwrap();
-
-        let add_column =
-            get_mut_table!(database, name)
-                .unwrap()
-                .add_column(1, "name", DataType::Utf8);
-        add_column.unwrap();
-
-        get_mut_table!(database, name)
-            .unwrap()
-            .append_column_data::<StringArray>(
-                1,
-                StringArray::from(vec!["Alice", "Bob", "Charlie", "David"]).into(),
-            )
-            .unwrap();
-
-        database.print();
     }
 }
