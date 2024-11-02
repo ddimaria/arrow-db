@@ -111,7 +111,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn text_benchmark_sql_on_large_db() {
+    async fn test_benchmark_sql_on_large_db() {
         let now = Instant::now();
         let database = Database::new_from_disk("LargeDB").await.unwrap();
         let elapsed = now.elapsed();
@@ -132,26 +132,14 @@ pub mod tests {
         let elapsed = now.elapsed();
 
         println!(
-            "{:?}",
-            get_table!(database, "flights_1m")
-                .unwrap()
-                .record_batch
-                .schema()
-        );
-
-        println!(
             "Added {} rows and {} cols into context in {:.2?}",
             rows, cols, elapsed
         );
 
         let now = Instant::now();
-        database
-            .query("select * from flights_1m where flights_1m.\"DISTANCE\" > 1000 and flights_1m.\"DISTANCE\" < 3000 limit 100")
-            .await
-            .unwrap()
-            .show()
-            .await
-            .unwrap();
+        database.test_query(
+            "select * from flights_1m where flights_1m.\"DISTANCE\" > 1000 and flights_1m.\"DISTANCE\" < 3000 limit 100")
+            .await;
         let elapsed = now.elapsed();
 
         println!(

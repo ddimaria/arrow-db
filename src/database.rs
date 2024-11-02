@@ -246,7 +246,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn text_benchmark_large_db() {
+    async fn test_benchmark_large_db() {
         let now = Instant::now();
         let database = Database::new_from_disk("LargeDB").await.unwrap();
         let elapsed = now.elapsed();
