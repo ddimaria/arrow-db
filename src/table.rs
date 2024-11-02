@@ -11,6 +11,7 @@ pub struct Table<'a> {
 }
 
 impl<'a> Table<'a> {
+    /// Create a new table
     pub fn new(name: &'a str) -> Table<'a> {
         let schema = Arc::new(Schema::empty());
 

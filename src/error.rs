@@ -26,12 +26,12 @@ pub enum DbError {
     #[error("Table {0} already exists")]
     TableAlreadyExists(String),
 
+    #[error("Error exporting Table {0}: {1}")]
+    TableExportError(String, String),
+
+    #[error("Error importing Table {0}: {1}")]
+    TableImportError(String, String),
+
     #[error("Table {0} not found")]
     TableNotFound(String),
 }
-
-// impl From<arrow::error::ArrowError> for DbError {
-//     fn from(e: arrow::error::ArrowError) -> Self {
-//         DbError::ArrayData(e.to_string())
-//     }
-// }

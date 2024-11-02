@@ -3,30 +3,43 @@ use futures::TryStreamExt;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::fs::File;
 
-use crate::error::Result;
+use crate::error::{DbError, Result};
 use crate::table::Table;
 
 impl<'a> Table<'a> {
+    /// Helper function to create a `DbError` for table import errors
+    fn import_error(&self, error: impl ToString) -> DbError {
+        DbError::TableImportError(self.name.into(), error.to_string())
+    }
+
+    /// Generic import the table from a parquet file
     pub async fn import_parquet(&mut self, file: File) -> Result<()> {
         let builder = ParquetRecordBatchStreamBuilder::new(file)
             .await
-            .unwrap()
+            .map_err(|e| self.import_error(e))?
             .with_batch_size(8192);
 
-        let stream = builder.build().unwrap();
-        let record_batches = stream.try_collect::<Vec<_>>().await.unwrap();
+        let stream = builder.build().map_err(|e| self.import_error(e))?;
+        let record_batches = stream
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|e| self.import_error(e))?;
 
         if let Some(batch) = record_batches.first() {
             let schema = batch.schema();
-            self.record_batch = concat_batches(&schema, &record_batches).unwrap();
+            self.record_batch =
+                concat_batches(&schema, &record_batches).map_err(|e| self.import_error(e))?;
         }
 
         Ok(())
     }
 
+    /// Import the table from a parquet file on disk
     pub async fn import_parquet_from_disk(&mut self, path: &str) -> Result<()> {
         let file_name = format!("{path}/{}.parquet", self.name);
-        let file = File::open(&file_name).await.unwrap();
+        let file = File::open(&file_name)
+            .await
+            .map_err(|e| self.import_error(e))?;
 
         self.import_parquet(file).await
     }

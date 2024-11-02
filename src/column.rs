@@ -32,6 +32,7 @@ impl SetKind {
 }
 
 impl<'a> Table<'a> {
+    /// Get the primitive width of a data type
     fn column_primitive_width(&self, data: &DataType) -> Result<usize> {
         data.primitive_width().ok_or_else(|| {
             DbError::DataType(format!(
@@ -53,7 +54,11 @@ impl<'a> Table<'a> {
         Ok(())
     }
 
-    pub fn new_column(schema: Arc<Schema>, columns: Vec<Arc<dyn Array>>) -> Result<RecordBatch> {
+    /// Create a new `RecordBatch` from a schema and columns
+    pub fn new_record_batch(
+        schema: Arc<Schema>,
+        columns: Vec<Arc<dyn Array>>,
+    ) -> Result<RecordBatch> {
         RecordBatch::try_new(schema, columns)
             .map_err(|e| DbError::CreateRecordBatch(format!("Error creating RecordBatch: {e}")))
     }
@@ -81,7 +86,7 @@ impl<'a> Table<'a> {
         columns.push(Arc::new(column));
 
         let schema = Arc::new(Schema::new(fields));
-        self.record_batch = Self::new_column(schema, columns)?;
+        self.record_batch = Self::new_record_batch(schema, columns)?;
 
         Ok(())
     }
@@ -190,12 +195,13 @@ impl<'a> Table<'a> {
         Ok(())
     }
 
+    /// Replace a column in the table with a new `ArrayRef`
     pub fn replace_column_data(&mut self, column_index: usize, data: ArrayRef) -> Result<()> {
         let mut columns = self.record_batch.columns().to_vec();
         columns[column_index] = data;
 
         let schema = self.record_batch.schema();
-        self.record_batch = Self::new_column(schema, columns)?;
+        self.record_batch = Self::new_record_batch(schema, columns)?;
 
         Ok(())
     }

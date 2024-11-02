@@ -9,6 +9,7 @@ use crate::{
 };
 
 impl<'a> Database<'a> {
+    /// Register a table with the DataFusion context
     pub fn add_table_context(&self, table: Table<'a>) -> Result<()> {
         let table_name = table.name;
         let schema = table.record_batch.schema();
@@ -21,6 +22,7 @@ impl<'a> Database<'a> {
         Ok(())
     }
 
+    /// Register all tables with the DataFusion context
     pub fn add_all_table_contexts(&self) -> Result<()> {
         for table in self.tables.iter() {
             // TODO(ddimaria): remove this clone
@@ -30,14 +32,15 @@ impl<'a> Database<'a> {
         Ok(())
     }
 
+    /// Remove a table from the DataFusion context
     pub fn remove_table_context(&mut self, table: Table<'a>) -> Result<Arc<dyn TableProvider>> {
         let table_name = table.name;
-
         let provider = self.ctx.deregister_table(table_name).unwrap().unwrap();
 
         Ok(provider)
     }
 
+    /// Run a SQL query, returning a `DataFrame`
     pub async fn query(&self, sql: &str) -> Result<DataFrame> {
         let df = self
             .ctx
@@ -57,7 +60,15 @@ impl<'a> Database<'a> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::database::tests::{create_database, seed_database};
+    use std::time::Instant;
+
+    use crate::{
+        database::{
+            tests::{create_database, seed_database},
+            Database,
+        },
+        get_table,
+    };
 
     // use super::*;
 
@@ -97,5 +108,55 @@ pub mod tests {
         // sql_df.show().await.unwrap();
 
         // let batch = database.remove_table_context(table).unwrap();
+    }
+
+    #[tokio::test]
+    async fn text_benchmark_sql_on_large_db() {
+        let now = Instant::now();
+        let database = Database::new_from_disk("LargeDB").await.unwrap();
+        let elapsed = now.elapsed();
+
+        let rows = get_table!(database, "flights_1m")
+            .unwrap()
+            .record_batch
+            .num_rows();
+        let cols = get_table!(database, "flights_1m")
+            .unwrap()
+            .record_batch
+            .num_columns();
+
+        println!("Loaded {} rows and {} cols in {:.2?}", rows, cols, elapsed);
+
+        let now = Instant::now();
+        database.add_all_table_contexts().unwrap();
+        let elapsed = now.elapsed();
+
+        println!(
+            "{:?}",
+            get_table!(database, "flights_1m")
+                .unwrap()
+                .record_batch
+                .schema()
+        );
+
+        println!(
+            "Added {} rows and {} cols into context in {:.2?}",
+            rows, cols, elapsed
+        );
+
+        let now = Instant::now();
+        database
+            .query("select * from flights_1m where flights_1m.\"DISTANCE\" > 1000 and flights_1m.\"DISTANCE\" < 3000 limit 100")
+            .await
+            .unwrap()
+            .show()
+            .await
+            .unwrap();
+        let elapsed = now.elapsed();
+
+        println!(
+            "Queried 10 rows from {} rows and {} cols in {:.2?}",
+            rows, cols, elapsed
+        );
     }
 }

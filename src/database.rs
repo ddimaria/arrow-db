@@ -45,6 +45,7 @@ impl<'a> Database<'a> {
         })
     }
 
+    /// Add a table to the database
     pub fn add_table(&mut self, table: Table<'a>) -> Result<()> {
         let table_name = table.name;
 
@@ -57,18 +58,24 @@ impl<'a> Database<'a> {
         Ok(())
     }
 
+    /// Get a table from the database
     pub fn get_table(&self, name: &str) -> Result<Ref<'a, &str, Table>> {
         self.tables
             .get(name)
             .ok_or_else(|| DbError::TableNotFound(name.into()))
     }
 
+    /// Get a mutable table from the database
     pub fn get_mut_table(&self, name: &str) -> Result<RefMut<'a, &str, Table>> {
         self.tables
             .get_mut(name)
             .ok_or_else(|| DbError::TableNotFound(name.into()))
     }
 
+    /// Create a new database from a directory on disk
+    ///
+    /// The directory name is the database name, and each file
+    /// within the directory is a parquet file representing a table
     pub async fn new_from_disk(name: &str) -> Result<Database> {
         let mut database = Database::new(name)?;
         let path = format!("{DISK_PATH}{}", database.name);
@@ -100,6 +107,7 @@ impl<'a> Database<'a> {
         Ok(database)
     }
 
+    /// Export the database to a directory on disk
     pub async fn export_to_disk(&self) -> Result<()> {
         let path = format!("{DISK_PATH}{}", self.name);
         fs::create_dir_all(path.to_owned()).await.map_err(|e| {
