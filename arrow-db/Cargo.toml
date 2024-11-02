@@ -1,0 +1,16 @@
+[package]
+name = "arrow-db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arrow = { version = "53.2.0", features = ["prettyprint"] }
+arrow-flight = "53.2.0"
+arrow-schema = "53.2.0"
+datafusion = "42.1.0"
+futures = "0.3.31"
+parquet = { version = "53.2.0", features = ["async"] }
+serde = { version = "1.0.214", features = ["derive"] }
+tokio = { version = "1.41.0", features = ["rt-multi-thread", "parking_lot"] }
+tonic = "0.12.3"
+uuid = "1.7"

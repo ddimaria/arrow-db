@@ -1,5 +1,5 @@
 [package]
-name = "arrow-db"
+name = "arrow-db-core"
 version = "0.1.0"
 edition = "2021"
 
