@@ -1,56 +1,93 @@
+use std::sync::Arc;
+
+use datafusion::{catalog::TableProvider, datasource::MemTable, prelude::DataFrame};
+
+use crate::{
+    database::Database,
+    error::{DbError, Result},
+    table::Table,
+};
+
+impl<'a> Database<'a> {
+    pub fn add_table_context(&self, table: Table<'a>) -> Result<()> {
+        let table_name = table.name;
+        let schema = table.record_batch.schema();
+        let provider = MemTable::try_new(schema, vec![vec![table.record_batch]]).unwrap();
+
+        self.ctx
+            .register_table(table_name, Arc::new(provider))
+            .unwrap();
+
+        Ok(())
+    }
+
+    pub fn add_all_table_contexts(&self) -> Result<()> {
+        for table in self.tables.iter() {
+            // TODO(ddimaria): remove this clone
+            self.add_table_context(table.value().to_owned())?;
+        }
+
+        Ok(())
+    }
+
+    pub fn remove_table_context(&mut self, table: Table<'a>) -> Result<Arc<dyn TableProvider>> {
+        let table_name = table.name;
+
+        let provider = self.ctx.deregister_table(table_name).unwrap().unwrap();
+
+        Ok(provider)
+    }
+
+    pub async fn query(&self, sql: &str) -> Result<DataFrame> {
+        let df = self
+            .ctx
+            .sql(sql)
+            .await
+            .map_err(|e| DbError::Query(sql.into(), e.to_string()))?;
+
+        Ok(df)
+    }
+
+    #[cfg(test)]
+    pub async fn test_query(&self, sql: &str) {
+        println!("\n{}", sql);
+        self.query(sql).await.unwrap().show().await.unwrap();
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
-    use arrow::array::{Int32Array, StringArray};
-    use arrow_schema::DataType;
-
-    use crate::{database::tests::create_database, get_mut_table};
+    use crate::database::tests::{create_database, seed_database};
 
     // use super::*;
 
     #[tokio::test]
     async fn test_sql() {
-        let (mut database, table) = create_database();
-        let name = table.name;
-
-        get_mut_table!(database, name)
-            .unwrap()
-            .add_column::<Int32Array>(
-                0,
-                "id",
-                DataType::Int32,
-                Int32Array::from(vec![1, 2, 3, 4]).into(),
-            )
-            .unwrap();
-
-        get_mut_table!(database, name)
-            .unwrap()
-            .add_column::<StringArray>(
-                1,
-                "name",
-                DataType::Utf8,
-                StringArray::from(vec!["Alice", "Bob", "Charlie", "David"]).into(),
-            )
-            .unwrap();
+        let (mut database, _) = create_database();
+        seed_database(&mut database);
 
         database.print();
+        database.add_all_table_contexts().unwrap();
 
-        let table = database.tables.get("users").unwrap().to_owned();
+        database
+            .test_query("insert into users values (5, 'Eve')")
+            .await;
 
-        database.add_table_context(table).unwrap();
+        database
+            .test_query("insert into user_role values (5, 'manager')")
+            .await;
 
-        let sql_df = database
-            .ctx
-            .sql("insert into users values (5, 'Eve')")
-            .await
-            .unwrap();
-        sql_df.show().await.unwrap();
+        database
+            .test_query("select * from users inner join user_role on users.id = user_role.user_id ")
+            .await;
 
-        let sql_df = database
-            .ctx
-            .sql("select * from users where id > 1 order by name desc")
-            .await
-            .unwrap();
-        sql_df.show().await.unwrap();
+        database
+            .test_query(
+                "select * from users inner join user_role on users.id = user_role.user_id 
+                where id > 1 
+                order by name desc",
+            )
+            .await;
 
         // let sql_df = database
         //     .ctx

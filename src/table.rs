@@ -22,6 +22,7 @@ impl<'a> Table<'a> {
 
     #[cfg(test)]
     pub fn print(&self) {
+        println!("\nTable: {}", self.name);
         arrow::util::pretty::print_batches(&[self.record_batch.to_owned()]).unwrap();
     }
 }

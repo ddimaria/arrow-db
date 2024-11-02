@@ -8,6 +8,9 @@ pub enum DbError {
     #[error("{0}")]
     ArrayData(String),
 
+    #[error("Error creating Database: {0}")]
+    CreateDatabase(String),
+
     #[error("Error creating RecordBatch: {0}")]
     CreateRecordBatch(String),
 
@@ -16,6 +19,9 @@ pub enum DbError {
 
     #[error("{0}")]
     DataType(String),
+
+    #[error("Error executing query ({0}) {1}")]
+    Query(String, String),
 
     #[error("Table {0} already exists")]
     TableAlreadyExists(String),
