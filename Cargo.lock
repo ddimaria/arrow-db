@@ -227,6 +227,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow-db-client"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-flight",
+ "arrow-schema",
+ "datafusion",
+ "serde",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
 name = "arrow-db-core"
 version = "0.1.0"
 dependencies = [

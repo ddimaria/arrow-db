@@ -1,24 +1,76 @@
 use arrow::ipc::writer::{DictionaryTracker, IpcDataGenerator};
+use arrow_schema::Schema;
 use std::sync::Arc;
 
-use arrow_flight::{PollInfo, SchemaAsIpc};
-use datafusion::arrow::error::ArrowError;
-use datafusion::datasource::file_format::parquet::ParquetFormat;
-use datafusion::datasource::listing::{ListingOptions, ListingTableUrl};
-use futures::stream::BoxStream;
-use tonic::transport::Server;
-use tonic::{Request, Response, Status, Streaming};
-
-use datafusion::prelude::*;
-
+use arrow::record_batch::RecordBatch;
 use arrow_flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
     HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
+use arrow_flight::{PollInfo, SchemaAsIpc};
+use datafusion::arrow::error::ArrowError;
+use datafusion::datasource::file_format::parquet::ParquetFormat;
+use datafusion::datasource::listing::{ListingOptions, ListingTableUrl};
+use datafusion::datasource::MemTable;
+use datafusion::prelude::*;
+use futures::stream::BoxStream;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status, Streaming};
 
 #[derive(Clone)]
-pub struct FlightServiceImpl {}
+pub struct FlightServiceImpl {
+    pub state: Arc<SessionContext>,
+}
+
+impl FlightServiceImpl {
+    pub fn new() -> Result<Self, Status> {
+        Ok(Self {
+            state: Arc::new(Self::new_context()?),
+        })
+    }
+
+    fn new_context() -> Result<SessionContext, Status> {
+        // create local execution context
+        let ctx = SessionContext::new();
+
+        // Create sample RecordBatch (replace this with your actual data)
+        let schema = Arc::new(arrow::datatypes::Schema::new(vec![
+            arrow::datatypes::Field::new("id", arrow::datatypes::DataType::Int32, false),
+            arrow::datatypes::Field::new("name", arrow::datatypes::DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(arrow::array::Int32Array::from(vec![1, 2, 3])),
+                Arc::new(arrow::array::StringArray::from(vec!["a", "b", "c"])),
+            ],
+        )
+        .map_err(|e| Status::internal(e.to_string()))?;
+
+        // Create MemTable and register it
+        let table = MemTable::try_new(schema, vec![vec![batch]])
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        ctx.register_table("mytable", Arc::new(table))
+            .map_err(to_tonic_err)?;
+
+        Ok(ctx)
+    }
+
+    pub async fn get_schema(&self) -> Result<Schema, Status> {
+        let schema: Schema = self
+            .state
+            .table("mytable")
+            .await
+            .map_err(to_tonic_err)?
+            .schema()
+            .into();
+
+        Ok(schema)
+    }
+}
 
 #[tonic::async_trait]
 impl FlightService for FlightServiceImpl {
@@ -35,18 +87,12 @@ impl FlightService for FlightServiceImpl {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<SchemaResult>, Status> {
         let request = request.into_inner();
+        println!("get_schema: {:?}", request);
 
-        let listing_options = ListingOptions::new(Arc::new(ParquetFormat::default()));
-        let table_path = ListingTableUrl::parse(&request.path[0]).map_err(to_tonic_err)?;
-
-        let ctx = SessionContext::new();
-        let schema = listing_options
-            .infer_schema(&ctx.state(), &table_path)
-            .await
-            .unwrap();
-
+        let schema = self.get_schema().await?;
         let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let schema_result = SchemaAsIpc::new(&schema, &options)
+        let schema_ipc = SchemaAsIpc::new(&schema, &options);
+        let schema_result: SchemaResult = schema_ipc
             .try_into()
             .map_err(|e: ArrowError| Status::internal(e.to_string()))?;
 
@@ -58,23 +104,12 @@ impl FlightService for FlightServiceImpl {
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
+        println!("do_get: {:?}", ticket);
         match std::str::from_utf8(&ticket.ticket) {
             Ok(sql) => {
                 println!("do_get: {sql}");
 
-                // create local execution context
-                let ctx = SessionContext::new();
-
-                let testdata = datafusion::test_util::parquet_test_data();
-
-                // register parquet file with the execution context
-                ctx.register_parquet(
-                    "alltypes_plain",
-                    &format!("{testdata}/alltypes_plain.parquet"),
-                    ParquetReadOptions::default(),
-                )
-                .await
-                .map_err(to_tonic_err)?;
+                let ctx = Arc::clone(&self.state);
 
                 // create the DataFrame
                 let df = ctx.sql(sql).await.map_err(to_tonic_err)?;
@@ -178,8 +213,7 @@ fn to_tonic_err(e: datafusion::error::DataFusionError) -> Status {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
-    let service = FlightServiceImpl {};
-
+    let service = FlightServiceImpl::new()?;
     let svc = FlightServiceServer::new(service);
 
     println!("Listening on {addr:?}");

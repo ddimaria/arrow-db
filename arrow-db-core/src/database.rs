@@ -12,7 +12,7 @@ use crate::{
     table::Table,
 };
 
-const DISK_PATH: &'static str = "./data/";
+const DISK_PATH: &'static str = "./../data/";
 
 #[derive(Clone)]
 pub struct Database<'a> {
