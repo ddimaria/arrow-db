@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 arrow = { version = "53.2.0", features = ["prettyprint"] }
+arrow-db-core = { path = "../arrow-db-core" }
 arrow-flight = "53.2.0"
 arrow-schema = "53.2.0"
 datafusion = "42.1.0"

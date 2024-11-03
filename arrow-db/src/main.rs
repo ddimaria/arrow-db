@@ -2,7 +2,7 @@ use arrow::ipc::writer::{DictionaryTracker, IpcDataGenerator};
 use arrow_schema::Schema;
 use std::sync::Arc;
 
-use arrow::record_batch::RecordBatch;
+use arrow_db_core::Database;
 use arrow_flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
@@ -10,9 +10,6 @@ use arrow_flight::{
 };
 use arrow_flight::{PollInfo, SchemaAsIpc};
 use datafusion::arrow::error::ArrowError;
-use datafusion::datasource::file_format::parquet::ParquetFormat;
-use datafusion::datasource::listing::{ListingOptions, ListingTableUrl};
-use datafusion::datasource::MemTable;
 use datafusion::prelude::*;
 use futures::stream::BoxStream;
 use tonic::transport::Server;
@@ -24,39 +21,17 @@ pub struct FlightServiceImpl {
 }
 
 impl FlightServiceImpl {
-    pub fn new() -> Result<Self, Status> {
+    pub async fn new() -> Result<Self, Status> {
         Ok(Self {
-            state: Arc::new(Self::new_context()?),
+            state: Arc::new(Self::new_context().await?),
         })
     }
 
-    fn new_context() -> Result<SessionContext, Status> {
-        // create local execution context
-        let ctx = SessionContext::new();
+    async fn new_context() -> Result<SessionContext, Status> {
+        let database: Database = Database::new_from_disk("MyDb").await.unwrap();
+        database.add_all_table_contexts().unwrap();
 
-        // Create sample RecordBatch (replace this with your actual data)
-        let schema = Arc::new(arrow::datatypes::Schema::new(vec![
-            arrow::datatypes::Field::new("id", arrow::datatypes::DataType::Int32, false),
-            arrow::datatypes::Field::new("name", arrow::datatypes::DataType::Utf8, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(arrow::array::Int32Array::from(vec![1, 2, 3])),
-                Arc::new(arrow::array::StringArray::from(vec!["a", "b", "c"])),
-            ],
-        )
-        .map_err(|e| Status::internal(e.to_string()))?;
-
-        // Create MemTable and register it
-        let table = MemTable::try_new(schema, vec![vec![batch]])
-            .map_err(|e| Status::internal(e.to_string()))?;
-
-        ctx.register_table("mytable", Arc::new(table))
-            .map_err(to_tonic_err)?;
-
-        Ok(ctx)
+        Ok(database.ctx)
     }
 
     pub async fn get_schema(&self) -> Result<Schema, Status> {
@@ -207,13 +182,10 @@ fn to_tonic_err(e: datafusion::error::DataFusionError) -> Status {
     Status::internal(format!("{e:?}"))
 }
 
-/// This example shows how to wrap DataFusion with `FlightService` to support looking up schema information for
-/// Parquet files and executing SQL queries against them on a remote server.
-/// This example is run along-side the example `flight_client`.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
-    let service = FlightServiceImpl::new()?;
+    let service = FlightServiceImpl::new().await?;
     let svc = FlightServiceServer::new(service);
 
     println!("Listening on {addr:?}");

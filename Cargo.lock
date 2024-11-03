@@ -215,6 +215,7 @@ name = "arrow-db"
 version = "0.1.0"
 dependencies = [
  "arrow",
+ "arrow-db-core",
  "arrow-flight",
  "arrow-schema",
  "datafusion",

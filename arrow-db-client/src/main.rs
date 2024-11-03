@@ -1,19 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use datafusion::arrow::array::Int32Array;
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::datatypes::Schema;
 
-use arrow_flight::flight_descriptor;
+// use arrow_flight::flight_descriptor;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
-use arrow_flight::{FlightDescriptor, Ticket};
+use arrow_flight::{/*FlightDescriptor,*/ Ticket};
 use datafusion::arrow::util::pretty;
 
-/// This example shows how to wrap DataFusion with `FlightService` to support looking up schema information for
-/// Parquet files and executing SQL queries against them on a remote server.
-/// This example is run along-side the example `flight_server`.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create Flight client
@@ -32,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Call do_get to execute a SQL query and receive results
     let request = tonic::Request::new(Ticket {
-        ticket: "SELECT id FROM mytable".into(), // Changed query to use in-memory table
+        ticket: "SELECT * FROM users".into(),
     });
 
     let mut stream = client.do_get(request).await?.into_inner();

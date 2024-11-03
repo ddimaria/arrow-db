@@ -5,3 +5,5 @@ pub mod export;
 pub mod import;
 pub mod sql;
 pub mod table;
+
+pub use database::Database;
