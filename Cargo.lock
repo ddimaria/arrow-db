@@ -219,6 +219,7 @@ dependencies = [
  "arrow-schema",
  "datafusion",
  "serde",
+ "thiserror",
  "tokio",
  "tonic",
 ]
