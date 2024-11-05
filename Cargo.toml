@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "arrow-db",
+    "arrow-db-server",
     "arrow-db-client",
     "arrow-db-core",
 ]

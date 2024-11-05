@@ -211,23 +211,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arrow-db"
-version = "0.1.0"
-dependencies = [
- "arrow",
- "arrow-db-core",
- "arrow-flight",
- "arrow-schema",
- "datafusion",
- "futures",
- "parquet",
- "serde",
- "tokio",
- "tonic",
- "uuid",
-]
-
-[[package]]
 name = "arrow-db-client"
 version = "0.1.0"
 dependencies = [
@@ -253,6 +236,23 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "arrow-db-server"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-db-core",
+ "arrow-flight",
+ "arrow-schema",
+ "datafusion",
+ "futures",
+ "parquet",
+ "serde",
+ "tokio",
+ "tonic",
+ "uuid",
 ]
 
 [[package]]
