@@ -1,3 +1,8 @@
+//! Table operations.
+//!
+//! A table is a collection of equal length columns, known as a `RecordBatch` in
+//! Arrow.
+
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;

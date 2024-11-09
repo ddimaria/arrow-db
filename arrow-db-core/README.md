@@ -41,9 +41,12 @@ Add a column to the table and populate it with data.
 
 ```rust
 use arrow_db_core::database::Database;
-use arrow_db_core::types::{DataType, Int32Array};
+use arrow_db_core::table::Table;
+use arrow::array::{Int32Array, StringArray};
 
 let database = Database::new("MyDB").unwrap();
+let table = Table::new("users");
+database.add_table(table).unwrap();
 
 get_mut_table!(database, "users")
     .unwrap()

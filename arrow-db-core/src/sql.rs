@@ -1,3 +1,8 @@
+//! SQL operations in DataFusion.
+//!
+//! Before SQL queries can be executed on the database, the tables must be
+//! registered with the DataFusion context, which is a cheap operation.
+
 use std::sync::Arc;
 
 use datafusion::{catalog::TableProvider, datasource::MemTable, prelude::DataFrame};

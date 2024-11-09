@@ -1,3 +1,7 @@
+//! Import operations.
+//!
+//! Tables can be imported from parquet files on disk.
+
 use arrow::compute::concat_batches;
 use futures::TryStreamExt;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;

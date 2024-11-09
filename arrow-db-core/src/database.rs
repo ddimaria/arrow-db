@@ -1,3 +1,8 @@
+//! Database operations.
+//!
+//! A database is a collection of tables.  Each table is a collection of equal
+//! length columns, known as a `RecordBatch` in Arrow.
+
 use std::fmt::Debug;
 
 use dashmap::{

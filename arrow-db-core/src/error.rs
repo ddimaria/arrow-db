@@ -1,3 +1,7 @@
+//! Error types for the Arrow DB core library.
+//!
+//! Creates a `Result<T>` type to be used throughout the library.
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

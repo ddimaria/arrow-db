@@ -68,14 +68,14 @@ impl Client {
             .map_err(|e| DbClientError::Query(e.to_string()))?
             .into_inner();
 
-        // the schema should be the first message returned, else client should error
+        // convert FlightData to a stream
         let flight_data = stream
             .message()
             .await
             .map_err(|e| DbClientError::Query(e.to_string()))?
-            .unwrap();
+            .ok_or(DbClientError::Query("No flight data returned".to_string()))?;
 
-        // convert FlightData to a stream
+        // the schema should be the first message returned, else client should error
         let schema = Arc::new(
             Schema::try_from(&flight_data).map_err(|e| DbClientError::Query(e.to_string()))?,
         );

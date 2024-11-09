@@ -1,3 +1,11 @@
+//! Column operations
+//!
+//! Columns are a single data type and must be of equal length to other columns
+//! in a table.
+//!
+//! Arrow data structures are immutable, so they need to be manipulated and
+//! recreated for any changes in the structure.
+
 use std::convert::From;
 use std::sync::Arc;
 
@@ -13,6 +21,7 @@ use crate::{
     table::Table,
 };
 
+/// The kind of set operation to perform on a column.
 pub enum SetKind {
     Append(ArrayData),
     InsertAt(ArrayData),

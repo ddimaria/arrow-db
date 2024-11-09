@@ -1,5 +1,9 @@
+//! Export operations.
+//!
+//! Tables can be exported to parquet files on disk.
+
 use parquet::arrow::AsyncArrowWriter;
-use parquet::basic::{Compression, ZstdLevel};
+// use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
 use tokio::fs::File;
 
