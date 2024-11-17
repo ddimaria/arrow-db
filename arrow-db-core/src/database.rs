@@ -5,18 +5,19 @@
 
 use std::fmt::Debug;
 
+use bytes::Bytes;
 use dashmap::{
     mapref::one::{Ref, RefMut},
     DashMap,
 };
 use datafusion::prelude::SessionContext;
-use tokio::fs;
 
 use crate::{
     error::{DbError, Result},
     table::Table,
 };
 
+#[cfg(not(target_arch = "wasm32"))]
 const DISK_PATH: &'static str = "./../data/";
 
 #[derive(Clone)]
@@ -81,10 +82,11 @@ impl<'a> Database<'a> {
     ///
     /// The directory name is the database name, and each file
     /// within the directory is a parquet file representing a table
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn new_from_disk(name: &str) -> Result<Database> {
         let mut database = Database::new(name)?;
         let path = format!("{DISK_PATH}{}", database.name);
-        let mut entries = fs::read_dir(path.to_owned()).await.map_err(|e| {
+        let mut entries = tokio::fs::read_dir(path.to_owned()).await.map_err(|e| {
             DbError::CreateDatabase(format!("Error reading file: {}", e.to_string()))
         })?;
 
@@ -112,12 +114,25 @@ impl<'a> Database<'a> {
         Ok(database)
     }
 
+    pub fn load_table_bytes(&mut self, table_name: String, bytes: Bytes) -> Result<()> {
+        let table_name = Box::leak(table_name.into_boxed_str());
+        let mut table = Table::new(table_name);
+
+        table.import_parquet_from_bytes(bytes)?;
+        self.add_table(table)?;
+
+        Ok(())
+    }
+
     /// Export the database to a directory on disk
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn export_to_disk(&self) -> Result<()> {
         let path = format!("{DISK_PATH}{}", self.name);
-        fs::create_dir_all(path.to_owned()).await.map_err(|e| {
-            DbError::CreateDatabase(format!("Error creating directory: {}", e.to_string()))
-        })?;
+        tokio::fs::create_dir_all(path.to_owned())
+            .await
+            .map_err(|e| {
+                DbError::CreateDatabase(format!("Error creating directory: {}", e.to_string()))
+            })?;
 
         for table in self.tables.iter() {
             table
@@ -144,7 +159,7 @@ macro_rules! get_table {
     ( $self:ident, $name:tt ) => {
         $self
             .tables
-            .get(&$name)
+            .get($name)
             .ok_or($crate::error::DbError::TableNotFound($name.into()))
     };
 }
@@ -154,7 +169,7 @@ macro_rules! get_mut_table {
     ( $self:ident, $name:tt ) => {
         $self
             .tables
-            .get_mut(&$name)
+            .get_mut($name)
             .ok_or($crate::error::DbError::TableNotFound($name.into()))
     };
 }

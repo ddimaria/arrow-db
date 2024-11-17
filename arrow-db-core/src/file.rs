@@ -3,10 +3,6 @@
 //! Tables can be imported from parquet files on disk.
 
 use arrow::compute::concat_batches;
-use bytes::Bytes;
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-
-#[cfg(not(target_arch = "wasm32"))]
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
 
 use crate::error::{DbError, Result};
@@ -19,7 +15,7 @@ impl<'a> Table<'a> {
     }
 
     /// Import the table from a parquet file on disk
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "disk")]
     pub async fn import_parquet_from_disk(&mut self, path: &str) -> Result<()> {
         use futures::TryStreamExt;
 
@@ -40,24 +36,6 @@ impl<'a> Table<'a> {
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| self.import_error(e))?;
-
-        if let Some(batch) = record_batches.first() {
-            let schema = batch.schema();
-            self.record_batch =
-                concat_batches(&schema, &record_batches).map_err(|e| self.import_error(e))?;
-        }
-
-        Ok(())
-    }
-
-    /// Import the table from a parquet file on disk
-    pub fn import_parquet_from_bytes(&mut self, bytes: Bytes) -> Result<()> {
-        let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)
-            .map_err(|e| self.import_error(e))?
-            .with_batch_size(8192);
-
-        let reader = builder.build().map_err(|e| self.import_error(e))?;
-        let record_batches = reader.flatten().collect::<Vec<_>>();
 
         if let Some(batch) = record_batches.first() {
             let schema = batch.schema();

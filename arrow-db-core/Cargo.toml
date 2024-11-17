@@ -6,11 +6,25 @@ edition = "2021"
 [dependencies]
 arrow = { version = "53.2.0", features = ["prettyprint"] }
 arrow-schema = "53.2.0"
+bytes = "1.8.0"
 dashmap = "6.1.0"
-datafusion = "42.1.0"
-futures = "0.3.31"
+datafusion = { version = "42.1.0", default-features = false, features = ["parquet"] }
 parquet = { version = "53.2.0", features = ["async"] }
 serde = { version = "1.0.214", features = ["derive"] }
 thiserror = "1.0.66"
-tokio = { version = "1.41.0", features = ["fs", "io-util"] }
+futures = "0.3.31"
+chrono = "0.4"
+getrandom = "0.2"
+wasm-bindgen-futures = { version = "0.4.40", optional = true }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.41.0", optional = true, default-features = false, features = ["io-util", "rt", "sync", "macros", "time"] }
+
+[features]
+default = ["disk"]
+wasm = [
+    "chrono/wasmbind",
+    "getrandom/js",
+    "wasm-bindgen-futures"
+]
+disk = ["tokio/fs", "tokio/io-util"]

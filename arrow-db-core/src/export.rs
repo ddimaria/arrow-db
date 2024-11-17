@@ -4,8 +4,8 @@
 
 use parquet::arrow::AsyncArrowWriter;
 // use parquet::basic::{Compression, ZstdLevel};
+use parquet::arrow::async_writer::AsyncFileWriter;
 use parquet::file::properties::WriterProperties;
-use tokio::fs::File;
 
 use crate::error::{DbError, Result};
 use crate::table::Table;
@@ -17,12 +17,12 @@ impl<'a> Table<'a> {
     }
 
     /// Generic export the table to a parquet file
-    pub async fn export_parquet(&mut self, mut file: File) -> Result<()> {
+    pub async fn export_parquet_to_bytes(&mut self, buffer: impl AsyncFileWriter) -> Result<()> {
         let record_batch = &self.record_batch;
         let props = WriterProperties::builder()
             // .set_compression(Compression::ZSTD(ZstdLevel::try_new(10).unwrap()))
             .build();
-        let mut writer = AsyncArrowWriter::try_new(&mut file, record_batch.schema(), Some(props))
+        let mut writer = AsyncArrowWriter::try_new(buffer, record_batch.schema(), Some(props))
             .map_err(|e| self.export_error(e))?;
 
         writer
@@ -35,13 +35,14 @@ impl<'a> Table<'a> {
     }
 
     /// Export the table to a parquet file on disk
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn export_parquet_to_disk(&mut self, path: &str) -> Result<()> {
         let file_name = format!("{path}/{}.parquet", self.name);
-        let file = File::create(&file_name)
+        let file = tokio::fs::File::create(&file_name)
             .await
             .map_err(|e| self.export_error(e))?;
 
-        self.export_parquet(file).await
+        self.export_parquet_to_bytes(file).await
     }
 }
 

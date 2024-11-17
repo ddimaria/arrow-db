@@ -1,8 +1,13 @@
 [workspace]
 members = [
-    "arrow-db-server",
     "arrow-db-client",
     "arrow-db-core",
+    "arrow-db-server",
+    "arrow-db-wasm"
 ]
 
 resolver = "2"
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"

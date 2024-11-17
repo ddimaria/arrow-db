@@ -10,15 +10,17 @@ use datafusion::{catalog::TableProvider, datasource::MemTable, prelude::DataFram
 use crate::{
     database::Database,
     error::{DbError, Result},
+    get_table,
     table::Table,
 };
 
 impl<'a> Database<'a> {
     /// Register a table with the DataFusion context
-    pub fn add_table_context(&self, table: Table<'a>) -> Result<()> {
-        let table_name = table.name;
+    pub fn add_table_context(&self, table_name: &str) -> Result<()> {
+        let table = get_table!(self, table_name)?;
         let schema = table.record_batch.schema();
-        let provider = MemTable::try_new(schema, vec![vec![table.record_batch]]).unwrap();
+        let provider =
+            MemTable::try_new(schema, vec![vec![table.record_batch.to_owned()]]).unwrap();
 
         self.ctx
             .register_table(table_name, Arc::new(provider))
@@ -30,8 +32,7 @@ impl<'a> Database<'a> {
     /// Register all tables with the DataFusion context
     pub fn add_all_table_contexts(&self) -> Result<()> {
         for table in self.tables.iter() {
-            // TODO(ddimaria): remove this clone
-            self.add_table_context(table.value().to_owned())?;
+            self.add_table_context(&table.key().to_string())?;
         }
 
         Ok(())
