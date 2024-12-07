@@ -17,7 +17,8 @@
     "test:ui": "vitest --ui",
     "lint": "eslint src --max-warnings=0",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "wasm": "wasm-pack build ./../arrow-db-wasm --dev --target web --out-dir ../arrow-db-browser/arrow-db-wasm"
+    "build:wasm:dev": "wasm-pack build ./../arrow-db-wasm --dev --target web --out-dir ../arrow-db-browser/arrow-db-wasm",
+    "build:wasm:release": "wasm-pack build ./../arrow-db-wasm --target web --out-dir ../arrow-db-browser/arrow-db-wasm"
   },
   "dependencies": {
     "react": "^18.3.1",

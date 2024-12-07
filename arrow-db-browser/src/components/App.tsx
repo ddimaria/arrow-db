@@ -41,10 +41,9 @@ export default function App() {
         if (e.target) {
           const bytes = new Uint8Array(e.target.result as ArrayBuffer);
           const tableName = file.name.substring(0, file.name.lastIndexOf('.'));
-          database.read_file(tableName, bytes).then(() => {
-            setSchemas(database.get_schemas());
-            console.log(`Loaded table ${tableName}`);
-          });
+          database.read_file(tableName, bytes);
+          setSchemas(database.get_schemas());
+          console.log(`Loaded table ${tableName}`);
         }
       };
 
