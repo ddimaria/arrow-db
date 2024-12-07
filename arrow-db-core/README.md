@@ -19,7 +19,7 @@ Create a new database.
 ```rust
 use arrow_db_core::database::Database;
 
-let database = Database::new("MyDB").unwrap();
+let database = Database::new("MyDB")?;
 ```
 
 ### Create a Table
@@ -30,9 +30,9 @@ Create a new table in the database.
 use arrow_db_core::database::Database;
 use arrow_db_core::table::Table;
 
-let database = Database::new("MyDB").unwrap();
+let database = Database::new("MyDB")?;
 let table = Table::new("users");
-database.add_table(table).unwrap();
+database.add_table(table)?;
 ```
 
 ### Add a Column and Data to a Table
@@ -44,19 +44,17 @@ use arrow_db_core::database::Database;
 use arrow_db_core::table::Table;
 use arrow::array::{Int32Array, StringArray};
 
-let database = Database::new("MyDB").unwrap();
+let database = Database::new("MyDB")?;
 let table = Table::new("users");
-database.add_table(table).unwrap();
+database.add_table(table)?;
 
-get_mut_table!(database, "users")
-    .unwrap()
+get_mut_table!(database, "users")?
     .add_column::<Int32Array>(
         0,                                          // column index 
         "id",                                       // name
         DataType::Int32,                            // data type
         Int32Array::from(vec![1, 2, 3, 4]).into(),  // data
-    )
-    .unwrap();
+    )?;
 ```
 
 ### Append Data to a Column
@@ -64,13 +62,11 @@ get_mut_table!(database, "users")
 Append data to an existing column.
 
 ```rust
-get_mut_table!(database, "users")
-    .unwrap()
+get_mut_table!(database, "users")?
     .append_column_data::<Int32Array>(
         0,                                // column index
         Int32Array::from(vec![3]).into(), // data
-    )
-    .unwrap();
+    )?;
 ```
 
 ### Insert Data into a Column at a Specific Row
@@ -78,14 +74,12 @@ get_mut_table!(database, "users")
 Insert data into a column at a specific row.
 
 ```rust
-get_mut_table!(database, "users")
-    .unwrap()
+get_mut_table!(database, "users")?
     .insert_column_data::<Int32Array>(
         0,                                // column index
-        2, // row index
+        2,                                // row index
         Int32Array::from(vec![4]).into(), // data
-    )
-    .unwrap();
+    )?;
 ```
 
 ### Update Data in a Column at a Specific Row
@@ -93,14 +87,12 @@ get_mut_table!(database, "users")
 Update data in a column at a specific row.
 
 ```rust
-get_mut_table!(database, "users")
-    .unwrap()
+get_mut_table!(database, "users")?
     .update_column_data::<Int32Array>(
         0,                                // column index
         2,                                // row index
         Int32Array::from(vec![5]).into(), // data
-    )
-    .unwrap();
+    )?;
 ```
 
 ### Delete a Column
@@ -108,8 +100,5 @@ get_mut_table!(database, "users")
 Delete a column from the table.
 
 ```rust
-get_mut_table!(database, "users")
-    .unwrap()
-    .delete_column(0)
-    .unwrap();
+get_mut_table!(database, "users")?.delete_column(0)?;
 ```
