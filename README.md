@@ -14,12 +14,6 @@ ArrowDB is a teaching tool for learning about the power of Arrow and Arrow tooli
 | [arrow-db-wasm](arrow-db-wasm/README.md)       | A WebAssembly module for use in the ArrowDB browser.                |
 | [arrow-db-browser](arrow-db-browser/README.md) | A React app for interacting with the ArrowDB server in the browser. |
 
-- [ArrowDB Fundamentals](#arrowdb-fundamentals)
-  - [Disk Persistence](#disk-persistence)
-  - [DataFusion](#datafusion)
-  - [Arrow Flight RPC](#arrow-flight-rpc)
-  - [WebAssembly](#webassembly)
-
 
 ## ArrowDB Fundamentals
 
