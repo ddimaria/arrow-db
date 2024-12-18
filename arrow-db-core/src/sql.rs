@@ -5,7 +5,13 @@
 
 use std::sync::Arc;
 
-use datafusion::{catalog::TableProvider, datasource::MemTable, prelude::DataFrame};
+use datafusion::{
+    catalog::TableProvider,
+    common::DFSchema,
+    datasource::MemTable,
+    logical_expr::{DmlStatement, LogicalPlan, WriteOp},
+    prelude::DataFrame,
+};
 
 use crate::{
     database::Database,
@@ -54,6 +60,44 @@ impl<'a> Database<'a> {
             .await
             .map_err(|e| DbError::Query(sql.into(), e.to_string()))?;
 
+        let logical_plan = df.logical_plan().to_owned();
+
+        let logical_plan = match logical_plan {
+            LogicalPlan::Dml(DmlStatement {
+                table_name,
+                op: WriteOp::Update,
+                input,
+                ..
+            }) => {
+                let name = table_name.table();
+                let _session_state = self.ctx.state();
+                let table_provider = self.ctx.table_provider(table_name.clone()).await.unwrap();
+                let schema_ref = table_provider.schema();
+                let df_schema =
+                    DFSchema::try_from_qualified_schema(table_name.table(), schema_ref.as_ref())
+                        .unwrap();
+                println!("{:?} {:?}", name, input);
+
+                LogicalPlan::Dml(DmlStatement::new(
+                    table_name,
+                    Arc::new(df_schema),
+                    WriteOp::Update,
+                    input,
+                    // Arc::new(project(rename_logical_plan(input, &fields)?, exprs)?),
+                ))
+            }
+            _ => logical_plan,
+        };
+
+        let physical_plan = self
+            .ctx
+            .state()
+            .create_physical_plan(&logical_plan)
+            .await
+            .unwrap();
+
+        println!("{:?}", physical_plan);
+
         Ok(df)
     }
 
@@ -90,29 +134,27 @@ pub mod tests {
             .test_query("insert into users values (5, 'Eve')")
             .await;
 
-        database
-            .test_query("insert into user_role values (5, 'manager')")
-            .await;
+        // database
+        //     .test_query("insert into user_role values (5, 'manager')")
+        //     .await;
+
+        // database
+        //     .test_query("select * from users inner join user_role on users.id = user_role.user_id ")
+        //     .await;
+
+        // database
+        //     .test_query(
+        //         "select * from users inner join user_role on users.id = user_role.user_id
+        //         where id > 1
+        //         order by name desc",
+        //     )
+        //     .await;
 
         database
-            .test_query("select * from users inner join user_role on users.id = user_role.user_id ")
+            .test_query("update users set name = 'Eve2' where id = 5")
             .await;
 
-        database
-            .test_query(
-                "select * from users inner join user_role on users.id = user_role.user_id 
-                where id > 1 
-                order by name desc",
-            )
-            .await;
-
-        // let sql_df = database
-        //     .ctx
-        //     .sql("update users set name = 'Eve2' where id = 5")
-        //     .await
-        //     .unwrap();
-        // sql_df.show().await.unwrap();
-
+        // database.test_query("delete from users where id = 5").await;
         // let batch = database.remove_table_context(table).unwrap();
     }
 
