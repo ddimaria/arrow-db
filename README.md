@@ -14,16 +14,6 @@ ArrowDB is a teaching tool for learning about the power of Arrow and Arrow tooli
 | [arrow-db-wasm](arrow-db-wasm/README.md)       | A WebAssembly module for use in the ArrowDB browser.                |
 | [arrow-db-browser](arrow-db-browser/README.md) | A React app for interacting with the ArrowDB server in the browser. |
 
-
-<!-- omit in toc -->
-## Table of Contents
-- [ArrowDB Fundamentals](#arrowdb-fundamentals)
-  - [Disk Persistence](#disk-persistence)
-  - [DataFusion](#datafusion)
-  - [Arrow Flight RPC](#arrow-flight-rpc)
-  - [WebAssembly](#webassembly)
-
-
 ## ArrowDB Fundamentals
 
 ArrowDB is built on top of the [Apache Arrow](https://arrow.apache.org/) library in [Rust](https://docs.rs/arrow/latest/arrow/).  Arrow is a [columnar format](https://arrow.apache.org/docs/format/Columnar.html) that is optimized for in-memory data processing and analytics.  Full specifications for Arrow can be found at [https://arrow.apache.org/docs/format/index.html](https://arrow.apache.org/docs/format/index.html).
