@@ -10,7 +10,6 @@ use datafusion::arrow::datatypes::Schema;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::{FlightDescriptor, Ticket};
-use datafusion::arrow::util::pretty;
 use tonic::codegen::StdError;
 use tonic::transport::Channel;
 
@@ -57,9 +56,11 @@ impl Client {
     }
 
     /// Execute a SQL query and receive results
-    pub async fn query(&mut self, sql: &'static str) -> Result<Vec<RecordBatch>> {
+    pub async fn query(&mut self, sql: &str) -> Result<Vec<RecordBatch>> {
         // Call do_get to execute a SQL query and receive results
-        let request = tonic::Request::new(Ticket { ticket: sql.into() });
+        let request = tonic::Request::new(Ticket {
+            ticket: sql.to_string().into(),
+        });
 
         let mut stream = self
             .inner
@@ -79,7 +80,7 @@ impl Client {
         let schema = Arc::new(
             Schema::try_from(&flight_data).map_err(|e| DbClientError::Query(e.to_string()))?,
         );
-        println!("Schema: {schema:?}");
+        // println!("Schema: {schema:?}");
 
         // all the remaining stream messages should be dictionary and record batches
         let mut results = vec![];
@@ -96,9 +97,6 @@ impl Client {
 
             results.push(record_batch);
         }
-
-        // print the results
-        pretty::print_batches(&results).map_err(|e| DbClientError::Query(e.to_string()))?;
 
         Ok(results)
     }
