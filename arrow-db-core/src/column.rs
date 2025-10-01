@@ -10,7 +10,7 @@ use std::convert::From;
 use std::sync::Arc;
 
 use arrow::{
-    array::{Array, ArrayData, ArrayDataBuilder, ArrayRef, RecordBatch},
+    array::{Array, ArrayData, ArrayDataBuilder, ArrayRef, RecordBatch, StringArray},
     buffer::{Buffer, MutableBuffer},
     datatypes::DataType,
 };
@@ -130,8 +130,59 @@ impl<'a> Table<'a> {
         row_index: usize,
         data: ArrayData,
     ) -> Result<()> {
-        let set_kind = SetKind::Update(data);
-        self.set_column_data::<T>(column_index, row_index, set_kind)
+        // For variable-length types like strings, use a reconstruction approach
+        let column = self.record_batch.column(column_index);
+        let data_type = column.data_type();
+
+        match data_type {
+            DataType::Utf8 => {
+                // For UTF-8 strings, reconstruct the entire column
+                self.update_string_column_data(column_index, row_index, data)
+            }
+            _ => {
+                // For primitive types, use the existing buffer manipulation approach
+                let set_kind = SetKind::Update(data);
+                self.set_column_data::<T>(column_index, row_index, set_kind)
+            }
+        }
+    }
+
+    /// Update a string column at a specific row index by reconstructing the column
+    fn update_string_column_data(
+        &mut self,
+        column_index: usize,
+        row_index: usize,
+        new_data: ArrayData,
+    ) -> Result<()> {
+        let existing_column = self.record_batch.column(column_index);
+        let existing_array = existing_column
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| DbError::DataType("Expected StringArray".into()))?;
+
+        let new_array = StringArray::from(new_data);
+        if new_array.len() != 1 {
+            return Err(DbError::DataType(
+                "Update data must contain exactly one element".into(),
+            ));
+        }
+
+        let new_value = new_array.value(0);
+
+        // Reconstruct the entire column with the updated value
+        let mut values = Vec::new();
+        for i in 0..existing_array.len() {
+            if i == row_index {
+                values.push(new_value);
+            } else {
+                values.push(existing_array.value(i));
+            }
+        }
+
+        let updated_array = StringArray::from(values);
+        self.replace_column_data(column_index, Arc::new(updated_array))?;
+
+        Ok(())
     }
 
     /// Remove a column in the table at a specified row index.
@@ -215,6 +266,37 @@ impl<'a> Table<'a> {
         Ok(())
     }
 
+    /// Append a complete row to the table by appending to all columns simultaneously
+    pub fn append_row(&mut self, row_data: Vec<ArrayRef>) -> Result<()> {
+        if row_data.len() != self.record_batch.num_columns() {
+            return Err(DbError::CreateRecordBatch(format!(
+                "Row data length {} does not match table column count {}",
+                row_data.len(),
+                self.record_batch.num_columns()
+            )));
+        }
+
+        let mut new_columns = Vec::new();
+        let existing_columns = self.record_batch.columns();
+
+        for (col_idx, new_data) in row_data.iter().enumerate() {
+            let existing_column = &existing_columns[col_idx];
+
+            // Concatenate the existing column with the new data
+            let concat_result =
+                arrow::compute::concat(&[existing_column.as_ref(), new_data.as_ref()]).map_err(
+                    |e| DbError::CreateRecordBatch(format!("Error concatenating columns: {}", e)),
+                )?;
+
+            new_columns.push(concat_result);
+        }
+
+        let schema = self.record_batch.schema();
+        self.record_batch = Self::new_record_batch(schema, new_columns)?;
+
+        Ok(())
+    }
+
     #[cfg(test)]
     pub fn print_column(&self, column_index: usize) {
         let column = self.record_batch.column(column_index).to_owned();
@@ -230,8 +312,8 @@ impl<'a> Table<'a> {
 
 #[cfg(test)]
 pub mod tests {
-    use arrow::array::{Int32Array, StringArray /*, UnionArray */};
-    // use arrow_schema::{UnionFields, UnionMode};
+    use arrow::array::{Int32Array, StringArray, UnionArray};
+    use arrow_schema::{UnionFields, UnionMode};
 
     use super::*;
 
@@ -296,29 +378,94 @@ pub mod tests {
         assert_eq!(expected, data);
     }
 
-    // #[test]
-    // fn test_union_column() {
-    //     let mut table = Table::new("users");
-    //     let fields = UnionFields::new(
-    //         vec![1, 3],
-    //         vec![
-    //             Field::new("field1", DataType::UInt8, false),
-    //             Field::new("field3", DataType::Utf8, false),
-    //         ],
-    //     );
-    //     table
-    //         .add_column::<UnionArray>(
-    //             0,
-    //             "name",
-    //             DataType::Union(fields, UnionMode::Sparse),
-    //             UnionArray::from(vec!["Alice", "Bob", "Charlie", "David"]).into(),
-    //         )
-    //         .unwrap();
+    #[test]
+    fn test_append_row() {
+        let mut table = Table::new("users");
 
-    //     table.print_column(0);
+        // First add columns with initial data
+        table
+            .add_column::<Int32Array>(
+                0,
+                "id",
+                DataType::Int32,
+                Int32Array::from(vec![1, 2, 3, 4]).into(),
+            )
+            .unwrap();
 
-    //     let expected = StringArray::from(vec!["Alice", "Bob", "Charlie", "David"]).to_data();
-    //     let data = table.record_batch.column(0).to_data();
-    //     assert_eq!(expected, data);
-    // }
+        table
+            .add_column::<StringArray>(
+                1,
+                "name",
+                DataType::Utf8,
+                StringArray::from(vec!["Alice", "Bob", "Charlie", "David"]).into(),
+            )
+            .unwrap();
+
+        println!("Before append_row:");
+        table.print();
+
+        // Now append a row
+        let row_data = vec![
+            Arc::new(Int32Array::from(vec![5])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["Eve"])) as ArrayRef,
+        ];
+
+        table.append_row(row_data).unwrap();
+
+        println!("After append_row:");
+        table.print();
+
+        // Verify the data
+        assert_eq!(table.record_batch.num_rows(), 5);
+        let id_column = table.record_batch.column(0);
+        let name_column = table.record_batch.column(1);
+
+        let id_array = id_column.as_any().downcast_ref::<Int32Array>().unwrap();
+        let name_array = name_column.as_any().downcast_ref::<StringArray>().unwrap();
+
+        assert_eq!(id_array.value(4), 5);
+        assert_eq!(name_array.value(4), "Eve");
+    }
+
+    #[test]
+    fn test_union_column() {
+        let mut table = Table::new("users");
+        let fields = UnionFields::new(
+            vec![0, 1],
+            vec![
+                Field::new("field0", DataType::Int32, false),
+                Field::new("field1", DataType::Utf8, false),
+            ],
+        );
+
+        let int_array = Int32Array::from(vec![1, 2, 3, 4]);
+        let string_array = StringArray::from(vec!["Alice", "Bob", "Charlie", "David"]);
+
+        let children = vec![
+            Arc::new(int_array) as Arc<dyn Array>,
+            Arc::new(string_array),
+        ];
+
+        let array = UnionArray::try_new(
+            fields.clone(),
+            vec![0, 1, 0, 1, 0, 1, 0, 1].into(),
+            Some(vec![0, 0, 1, 1, 2, 2, 3, 3].into()),
+            children,
+        )
+        .unwrap();
+
+        table
+            .add_column::<UnionArray>(
+                0,
+                "name",
+                DataType::Union(fields, UnionMode::Dense),
+                array.into(),
+            )
+            .unwrap();
+
+        table.print();
+
+        let data = table.record_batch.column(0).to_data();
+        println!("{:?}", data);
+    }
 }
