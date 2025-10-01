@@ -3,6 +3,7 @@ pub mod database;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod row;
 pub mod sql;
 pub mod table;
 
