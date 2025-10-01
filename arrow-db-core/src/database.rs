@@ -20,11 +20,20 @@ use crate::{
 #[cfg(not(target_arch = "wasm32"))]
 const DISK_PATH: &'static str = "./../data/";
 
-#[derive(Clone)]
 pub struct Database<'a> {
     pub name: &'a str,
     pub tables: DashMap<&'a str, Table<'a>>,
     pub ctx: SessionContext,
+}
+
+impl<'a> Clone for Database<'a> {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name,
+            tables: self.tables.clone(),
+            ctx: SessionContext::new(), // Create a new context for the clone
+        }
+    }
 }
 
 impl Debug for Database<'_> {
@@ -65,14 +74,14 @@ impl<'a> Database<'a> {
     }
 
     /// Get a table from the database
-    pub fn get_table(&self, name: &str) -> Result<Ref<'a, &str, Table>> {
+    pub fn get_table(&self, name: &str) -> Result<Ref<'a, &str, Table<'_>>> {
         self.tables
             .get(name)
             .ok_or_else(|| DbError::TableNotFound(name.into()))
     }
 
     /// Get a mutable table from the database
-    pub fn get_mut_table(&self, name: &str) -> Result<RefMut<'a, &str, Table>> {
+    pub fn get_mut_table(&self, name: &str) -> Result<RefMut<'a, &str, Table<'_>>> {
         self.tables
             .get_mut(name)
             .ok_or_else(|| DbError::TableNotFound(name.into()))
@@ -83,7 +92,7 @@ impl<'a> Database<'a> {
     /// The directory name is the database name, and each file
     /// within the directory is a parquet file representing a table
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn new_from_disk(name: &str) -> Result<Database> {
+    pub async fn new_from_disk(name: &str) -> Result<Database<'_>> {
         let mut database = Database::new(name)?;
         let path = format!("{DISK_PATH}{}", database.name);
         let mut entries = tokio::fs::read_dir(path.to_owned()).await.map_err(|e| {

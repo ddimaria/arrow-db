@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde_wasm_bindgen;
 use utils::set_panic_hook;
 use utils::to_serializable;
-use utils::SerializableRecordBatch;
+use utils::{SchemaField, SerializableRecordBatch, TableSchema};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures;
@@ -118,18 +118,30 @@ impl ArrowDbWasm {
     }
 
     #[wasm_bindgen]
-    pub fn get_schemas(&self) -> Vec<String> {
-        self.database
+    pub fn get_schemas(&self) -> Result<JsValue, JsValue> {
+        let schemas: Vec<TableSchema> = self
+            .database
             .tables
             .iter()
-            .map(|k| {
-                format!(
-                    "{}: {}",
-                    k.key(),
-                    k.value().record_batch.schema().to_string()
-                )
+            .map(|table_entry| {
+                let table_name = table_entry.key().to_string();
+                let schema = table_entry.value().record_batch.schema();
+
+                let fields: Vec<SchemaField> = schema
+                    .fields()
+                    .iter()
+                    .map(|field| SchemaField {
+                        name: field.name().clone(),
+                        data_type: field.data_type().to_string(),
+                        nullable: field.is_nullable(),
+                    })
+                    .collect();
+
+                TableSchema { table_name, fields }
             })
-            .collect()
+            .collect();
+
+        serde_wasm_bindgen::to_value(&schemas).map_err(|e| JsValue::from_str(&e.to_string()))
     }
 }
 
