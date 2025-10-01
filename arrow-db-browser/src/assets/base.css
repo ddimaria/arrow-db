@@ -12,14 +12,27 @@ html, body {
 }
 
 .fill-grid {
-  /* height: 100%; */
+  height: 100%;
   block-size: 100%;
+  overflow: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .rdg-cell {
   border: 1px solid #eee;
 }
 
+/* Ensure loading overlay is always on top */
+.loading-overlay {
+  z-index: 9999 !important;
+}
+
 :before,:after {
   box-sizing: border-box;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

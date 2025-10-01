@@ -2,10 +2,23 @@
 
 ## Getting Started
 
-Install dependencies.
+First, install dependencies.
 
 ```bash
+npm i -g pnpm
 pnpm install
+```
+
+Next, build the wasm package.  For dev builds:
+
+```bash
+pnpm run build:wasm:dev
+```
+
+For release builds:
+
+```bash
+pnpm run build:wasm:release
 ```
 
 Serve with hot reload at <http://localhost:5173>.
