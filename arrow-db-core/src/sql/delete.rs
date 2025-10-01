@@ -2,20 +2,9 @@
 //!
 //!
 
-use std::sync::Arc;
-
 use datafusion::logical_expr::{Expr, LogicalPlan};
 
-use arrow::array::{
-    Array, ArrayRef, BooleanArray, Date32Array, Float32Array, Float64Array, Int32Array, StringArray,
-};
-
-use crate::{
-    database::Database,
-    error::{DbError, Result},
-    get_mut_table, get_table,
-    table::Table,
-};
+use crate::{database::Database, error::Result, get_mut_table, get_table};
 
 /// Represents parsed DELETE components
 #[derive(Debug, Clone)]
@@ -69,141 +58,12 @@ impl<'a> Database<'a> {
         // delete rows in reverse order to maintain correct indices
         let mut deleted_count = 0;
         for &row_idx in rows_to_delete.iter().rev() {
-            self.delete_row_from_table(table_name, row_idx)?;
+            let mut table = get_mut_table!(self, table_name)?;
+            table.delete_row(row_idx)?;
             deleted_count += 1;
         }
 
         Ok(deleted_count)
-    }
-
-    /// Delete a single row from a table by reconstructing all columns without that row
-    pub(crate) fn delete_row_from_table(&self, table_name: &str, row_idx: usize) -> Result<()> {
-        let mut table = get_mut_table!(self, table_name)?;
-        let num_rows = table.record_batch.num_rows();
-        let num_columns = table.record_batch.num_columns();
-
-        if row_idx >= num_rows {
-            return Err(DbError::Query(
-                format!(
-                    "Row index {} out of bounds (table has {} rows)",
-                    row_idx, num_rows
-                ),
-                "".into(),
-            ));
-        }
-
-        // create new columns without the specified row
-        let mut new_columns = Vec::new();
-
-        for col_idx in 0..num_columns {
-            let column = table.record_batch.column(col_idx);
-            let data_type = column.data_type();
-
-            match data_type {
-                arrow::datatypes::DataType::Int32 => {
-                    if let Some(int_array) = column.as_any().downcast_ref::<Int32Array>() {
-                        let mut values = Vec::new();
-                        for i in 0..num_rows {
-                            if i != row_idx {
-                                values.push(if int_array.is_null(i) {
-                                    None
-                                } else {
-                                    Some(int_array.value(i))
-                                });
-                            }
-                        }
-                        new_columns.push(Arc::new(Int32Array::from(values)) as ArrayRef);
-                    }
-                }
-                arrow::datatypes::DataType::Float32 => {
-                    if let Some(float_array) = column.as_any().downcast_ref::<Float32Array>() {
-                        let mut values = Vec::new();
-                        for i in 0..num_rows {
-                            if i != row_idx {
-                                values.push(if float_array.is_null(i) {
-                                    None
-                                } else {
-                                    Some(float_array.value(i))
-                                });
-                            }
-                        }
-                        new_columns.push(Arc::new(Float32Array::from(values)) as ArrayRef);
-                    }
-                }
-                arrow::datatypes::DataType::Float64 => {
-                    if let Some(float_array) = column.as_any().downcast_ref::<Float64Array>() {
-                        let mut values = Vec::new();
-                        for i in 0..num_rows {
-                            if i != row_idx {
-                                values.push(if float_array.is_null(i) {
-                                    None
-                                } else {
-                                    Some(float_array.value(i))
-                                });
-                            }
-                        }
-                        new_columns.push(Arc::new(Float64Array::from(values)) as ArrayRef);
-                    }
-                }
-                arrow::datatypes::DataType::Boolean => {
-                    if let Some(bool_array) = column.as_any().downcast_ref::<BooleanArray>() {
-                        let mut values = Vec::new();
-                        for i in 0..num_rows {
-                            if i != row_idx {
-                                values.push(if bool_array.is_null(i) {
-                                    None
-                                } else {
-                                    Some(bool_array.value(i))
-                                });
-                            }
-                        }
-                        new_columns.push(Arc::new(BooleanArray::from(values)) as ArrayRef);
-                    }
-                }
-                arrow::datatypes::DataType::Date32 => {
-                    if let Some(date_array) = column.as_any().downcast_ref::<Date32Array>() {
-                        let mut values = Vec::new();
-                        for i in 0..num_rows {
-                            if i != row_idx {
-                                values.push(if date_array.is_null(i) {
-                                    None
-                                } else {
-                                    Some(date_array.value(i))
-                                });
-                            }
-                        }
-                        new_columns.push(Arc::new(Date32Array::from(values)) as ArrayRef);
-                    }
-                }
-                arrow::datatypes::DataType::Utf8 => {
-                    if let Some(string_array) = column.as_any().downcast_ref::<StringArray>() {
-                        let mut values = Vec::new();
-                        for i in 0..num_rows {
-                            if i != row_idx {
-                                values.push(if string_array.is_null(i) {
-                                    None
-                                } else {
-                                    Some(string_array.value(i))
-                                });
-                            }
-                        }
-                        new_columns.push(Arc::new(StringArray::from(values)) as ArrayRef);
-                    }
-                }
-                _ => {
-                    return Err(DbError::Query(
-                        format!("Unsupported data type for DELETE: {:?}", data_type),
-                        "".into(),
-                    ));
-                }
-            }
-        }
-
-        // replace the entire record batch with the new columns
-        let schema = table.record_batch.schema();
-        table.record_batch = Table::new_record_batch(schema, new_columns)?;
-
-        Ok(())
     }
 }
 

@@ -266,37 +266,6 @@ impl<'a> Table<'a> {
         Ok(())
     }
 
-    /// Append a complete row to the table by appending to all columns simultaneously
-    pub fn append_row(&mut self, row_data: Vec<ArrayRef>) -> Result<()> {
-        if row_data.len() != self.record_batch.num_columns() {
-            return Err(DbError::CreateRecordBatch(format!(
-                "Row data length {} does not match table column count {}",
-                row_data.len(),
-                self.record_batch.num_columns()
-            )));
-        }
-
-        let mut new_columns = Vec::new();
-        let existing_columns = self.record_batch.columns();
-
-        for (col_idx, new_data) in row_data.iter().enumerate() {
-            let existing_column = &existing_columns[col_idx];
-
-            // Concatenate the existing column with the new data
-            let concat_result =
-                arrow::compute::concat(&[existing_column.as_ref(), new_data.as_ref()]).map_err(
-                    |e| DbError::CreateRecordBatch(format!("Error concatenating columns: {}", e)),
-                )?;
-
-            new_columns.push(concat_result);
-        }
-
-        let schema = self.record_batch.schema();
-        self.record_batch = Self::new_record_batch(schema, new_columns)?;
-
-        Ok(())
-    }
-
     #[cfg(test)]
     pub fn print_column(&self, column_index: usize) {
         let column = self.record_batch.column(column_index).to_owned();
@@ -376,55 +345,6 @@ pub mod tests {
         let expected = StringArray::from(vec!["Alice", "Bob", "Charlie", "David"]).to_data();
         let data = table.record_batch.column(0).to_data();
         assert_eq!(expected, data);
-    }
-
-    #[test]
-    fn test_append_row() {
-        let mut table = Table::new("users");
-
-        // First add columns with initial data
-        table
-            .add_column::<Int32Array>(
-                0,
-                "id",
-                DataType::Int32,
-                Int32Array::from(vec![1, 2, 3, 4]).into(),
-            )
-            .unwrap();
-
-        table
-            .add_column::<StringArray>(
-                1,
-                "name",
-                DataType::Utf8,
-                StringArray::from(vec!["Alice", "Bob", "Charlie", "David"]).into(),
-            )
-            .unwrap();
-
-        println!("Before append_row:");
-        table.print();
-
-        // Now append a row
-        let row_data = vec![
-            Arc::new(Int32Array::from(vec![5])) as ArrayRef,
-            Arc::new(StringArray::from(vec!["Eve"])) as ArrayRef,
-        ];
-
-        table.append_row(row_data).unwrap();
-
-        println!("After append_row:");
-        table.print();
-
-        // Verify the data
-        assert_eq!(table.record_batch.num_rows(), 5);
-        let id_column = table.record_batch.column(0);
-        let name_column = table.record_batch.column(1);
-
-        let id_array = id_column.as_any().downcast_ref::<Int32Array>().unwrap();
-        let name_array = name_column.as_any().downcast_ref::<StringArray>().unwrap();
-
-        assert_eq!(id_array.value(4), 5);
-        assert_eq!(name_array.value(4), "Eve");
     }
 
     #[test]
