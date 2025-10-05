@@ -16,7 +16,7 @@ impl<'a> Database<'a> {
     /// Parse DELETE logical plan to extract WHERE clause
     pub(crate) fn parse_delete_plan(&self, input: &LogicalPlan) -> Result<DeleteComponents> {
         // for DELETE, we mainly need to extract the WHERE condition
-        let where_condition = self.extract_where_condition(input)?;
+        let where_condition = Self::extract_where_condition(input)?;
 
         Ok(DeleteComponents { where_condition })
     }

@@ -26,7 +26,7 @@ impl<'a> Table<'a> {
             .map_err(|e| self.export_error(e))?;
 
         writer
-            .write(&record_batch)
+            .write(record_batch)
             .await
             .map_err(|e| self.export_error(e))?;
         writer.close().await.map_err(|e| self.export_error(e))?;
@@ -51,6 +51,7 @@ pub mod tests {
     use crate::{
         database::tests::{create_database, seed_database},
         get_mut_table,
+        test_utils::{create_temp_dir, remove_temp_dir},
     };
 
     #[tokio::test]
@@ -58,10 +59,15 @@ pub mod tests {
         let (mut database, _) = create_database();
         seed_database(&mut database);
 
+        let temp_dir = create_temp_dir("arrow_db_test_export").await;
+
         get_mut_table!(database, "users")
             .unwrap()
-            .export_parquet_to_disk(database.name)
+            .export_parquet_to_disk(&temp_dir)
             .await
             .unwrap();
+
+        // Clean up
+        remove_temp_dir(&temp_dir).await;
     }
 }

@@ -30,7 +30,7 @@ impl<'a> Database<'a> {
     }
 
     /// Extract WHERE condition from a logical plan
-    pub(crate) fn extract_where_condition(&self, plan: &LogicalPlan) -> Result<Option<Expr>> {
+    pub(crate) fn extract_where_condition(plan: &LogicalPlan) -> Result<Option<Expr>> {
         match plan {
             // primary filter node - contains the WHERE condition
             LogicalPlan::Filter(filter) => Ok(Some(filter.predicate.clone())),
@@ -39,22 +39,22 @@ impl<'a> Database<'a> {
             LogicalPlan::TableScan(_) => Ok(None),
 
             // projection - check input for WHERE conditions
-            LogicalPlan::Projection(projection) => self.extract_where_condition(&projection.input),
+            LogicalPlan::Projection(projection) => Self::extract_where_condition(&projection.input),
 
             // sort - check input for WHERE conditions (ORDER BY can have WHERE)
-            LogicalPlan::Sort(sort) => self.extract_where_condition(&sort.input),
+            LogicalPlan::Sort(sort) => Self::extract_where_condition(&sort.input),
 
             // limit - check input for WHERE conditions (LIMIT can have WHERE)
-            LogicalPlan::Limit(limit) => self.extract_where_condition(&limit.input),
+            LogicalPlan::Limit(limit) => Self::extract_where_condition(&limit.input),
 
             // aggregate - check input for WHERE conditions (GROUP BY can have WHERE)
-            LogicalPlan::Aggregate(aggregate) => self.extract_where_condition(&aggregate.input),
+            LogicalPlan::Aggregate(aggregate) => Self::extract_where_condition(&aggregate.input),
 
             // distinct - check input for WHERE conditions
             LogicalPlan::Distinct(_) => {
                 // use the generic inputs() method
                 if let Some(input) = plan.inputs().first() {
-                    self.extract_where_condition(input)
+                    Self::extract_where_condition(input)
                 } else {
                     Ok(None)
                 }
@@ -64,14 +64,14 @@ impl<'a> Database<'a> {
             LogicalPlan::Join(_) => {
                 let inputs = plan.inputs();
                 // first check left input (index 0)
-                if let Some(left_input) = inputs.get(0) {
-                    if let Some(condition) = self.extract_where_condition(left_input)? {
+                if let Some(left_input) = inputs.first() {
+                    if let Some(condition) = Self::extract_where_condition(left_input)? {
                         return Ok(Some(condition));
                     }
                 }
                 // then check right input (index 1)
                 if let Some(right_input) = inputs.get(1) {
-                    self.extract_where_condition(right_input)
+                    Self::extract_where_condition(right_input)
                 } else {
                     Ok(None)
                 }
@@ -80,7 +80,7 @@ impl<'a> Database<'a> {
             // union - check first input for WHERE conditions
             LogicalPlan::Union(_) => {
                 if let Some(first_input) = plan.inputs().first() {
-                    self.extract_where_condition(first_input)
+                    Self::extract_where_condition(first_input)
                 } else {
                     Ok(None)
                 }
@@ -89,7 +89,7 @@ impl<'a> Database<'a> {
             // subquery - check the subquery plan
             LogicalPlan::SubqueryAlias(_) => {
                 if let Some(input) = plan.inputs().first() {
-                    self.extract_where_condition(input)
+                    Self::extract_where_condition(input)
                 } else {
                     Ok(None)
                 }
@@ -98,7 +98,7 @@ impl<'a> Database<'a> {
             // for any other plan types, recursively check the first input
             _ => {
                 if let Some(input) = plan.inputs().first() {
-                    self.extract_where_condition(input)
+                    Self::extract_where_condition(input)
                 } else {
                     Ok(None)
                 }
@@ -512,12 +512,11 @@ impl<'a> Database<'a> {
     /// Check if a string matches a LIKE pattern (supports % and _ wildcards)
     pub(crate) fn matches_like_pattern(&self, text: &str, pattern: &str) -> bool {
         // simple LIKE pattern matching without regex dependency
-        self.simple_like_match(text, pattern, 0, 0)
+        Self::simple_like_match(text, pattern, 0, 0)
     }
 
     /// Simple LIKE pattern matching implementation
     pub(crate) fn simple_like_match(
-        &self,
         text: &str,
         pattern: &str,
         text_idx: usize,
@@ -539,17 +538,17 @@ impl<'a> Database<'a> {
             '%' => {
                 // % matches zero or more characters
                 // try matching with current position or advancing text
-                self.simple_like_match(text, pattern, text_idx, pattern_idx + 1)
-                    || self.simple_like_match(text, pattern, text_idx + 1, pattern_idx)
+                Self::simple_like_match(text, pattern, text_idx, pattern_idx + 1)
+                    || Self::simple_like_match(text, pattern, text_idx + 1, pattern_idx)
             }
             '_' => {
                 // _ matches exactly one character
-                self.simple_like_match(text, pattern, text_idx + 1, pattern_idx + 1)
+                Self::simple_like_match(text, pattern, text_idx + 1, pattern_idx + 1)
             }
             c => {
                 // regular character must match exactly
                 if text_chars[text_idx] == c {
-                    self.simple_like_match(text, pattern, text_idx + 1, pattern_idx + 1)
+                    Self::simple_like_match(text, pattern, text_idx + 1, pattern_idx + 1)
                 } else {
                     false
                 }

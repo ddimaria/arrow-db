@@ -216,18 +216,18 @@ impl<'a> Table<'a> {
 
         // ignore the empty single buffer of a newly created column
         let buffers = if column_len == 0 {
-            data.map_or_else(|| vec![], |data| data.buffers().to_vec())
+            data.map_or_else(std::vec::Vec::new, |data| data.buffers().to_vec())
         } else {
             let column_buffer = &column_data.buffers()[0];
             let mut buffer = MutableBuffer::new(new_len);
 
-            let width = self.column_primitive_width(&column.data_type())?;
+            let width = self.column_primitive_width(column.data_type())?;
             let adjusted_index = row_index * width;
             let spliced = column_buffer.split_at(adjusted_index);
 
             let end = match set_kind {
-                SetKind::Append(_) => &spliced.1,
-                SetKind::InsertAt(_) => &spliced.1,
+                SetKind::Append(_) => spliced.1,
+                SetKind::InsertAt(_) => spliced.1,
                 SetKind::Update(_) => &spliced.1[width..],
                 SetKind::Remove => &spliced.1[width..],
             };

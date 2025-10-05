@@ -56,7 +56,7 @@ impl<'a> Database<'a> {
                 }
 
                 // try to extract WHERE condition from the input of the projection
-                let where_condition = self.extract_where_condition(&projection.input)?;
+                let where_condition = Self::extract_where_condition(&projection.input)?;
 
                 Ok(UpdateComponents {
                     set_assignments,

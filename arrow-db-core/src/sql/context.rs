@@ -39,7 +39,7 @@ impl<'a> Database<'a> {
     /// Register all tables with the DataFusion context
     pub fn add_all_table_contexts(&self) -> Result<()> {
         for table in self.tables.iter() {
-            self.add_table_context(&table.key().to_string())?;
+            self.add_table_context(table.key().as_ref())?;
         }
 
         Ok(())

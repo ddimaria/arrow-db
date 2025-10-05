@@ -3,13 +3,11 @@ mod utils;
 use arrow_db_core::Database;
 use bytes::Bytes;
 use chrono::Utc;
-use serde_wasm_bindgen;
 use utils::set_panic_hook;
 use utils::to_serializable;
 use utils::{SchemaField, SerializableRecordBatch, TableSchema};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
-use wasm_bindgen_futures;
 
 #[wasm_bindgen]
 extern "C" {

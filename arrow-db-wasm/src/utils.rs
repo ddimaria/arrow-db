@@ -40,10 +40,7 @@ pub fn set_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-pub fn to_serializable(
-    headers: &Vec<String>,
-    record_batch: &RecordBatch,
-) -> SerializableRecordBatch {
+pub fn to_serializable(headers: &[String], record_batch: &RecordBatch) -> SerializableRecordBatch {
     let headers = headers
         .iter()
         .map(|header| Some(header.clone()))
