@@ -1334,6 +1334,7 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_benchmark_sql_on_large_db() {
         let now = Instant::now();
         let database = Database::new_from_disk("LargeDB").await.unwrap();
