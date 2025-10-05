@@ -1,10 +1,6 @@
-//! Column operations
+//! Row operations
 //!
-//! Columns are a single data type and must be of equal length to other columns
-//! in a table.
 //!
-//! Arrow data structures are immutable, so they need to be manipulated and
-//! recreated for any changes in the structure.
 
 use std::convert::From;
 use std::sync::Arc;

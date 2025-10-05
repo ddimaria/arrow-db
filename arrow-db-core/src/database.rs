@@ -87,6 +87,19 @@ impl<'a> Database<'a> {
             .ok_or_else(|| DbError::TableNotFound(name.into()))
     }
 
+    /// Remove a table from the database
+    pub fn remove_table(&mut self, name: &str) -> Result<()> {
+        // First deregister from DataFusion context if it exists
+        let _ = self.ctx.deregister_table(name);
+
+        // Remove from tables map
+        self.tables
+            .remove(name)
+            .ok_or_else(|| DbError::TableNotFound(name.into()))?;
+
+        Ok(())
+    }
+
     /// Create a new database from a directory on disk
     ///
     /// The directory name is the database name, and each file
