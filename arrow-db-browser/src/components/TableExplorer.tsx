@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { classNames } from '../utils';
+import ConfirmationModal from './ConfirmationModal';
 
 interface SchemaField {
   name: string;
@@ -17,6 +18,12 @@ interface TableExplorerProps {
   schemas?: TableSchema[] | null;
   onTableSelect?: (tableName: string) => void;
   onTableDoubleClick?: (tableName: string) => void;
+  onTableRemove?: (tableName: string) => void;
+  onTableClickForData?: (tableName: string) => void;
+  onTableClickForStructure?: (tableName: string) => void;
+  selectedTableForData?: string | null;
+  selectedTableForStructure?: string | null;
+  viewMode?: 'sql' | 'data' | 'structure';
 }
 
 interface TableInfo {
@@ -28,10 +35,20 @@ export default function TableExplorer({
   tables,
   schemas,
   onTableSelect,
-  onTableDoubleClick
+  onTableDoubleClick,
+  onTableRemove,
+  onTableClickForData,
+  onTableClickForStructure,
+  selectedTableForData,
+  selectedTableForStructure,
+  viewMode = 'sql'
 }: TableExplorerProps) {
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    tableName: string;
+  }>({ isOpen: false, tableName: '' });
 
   const toggleTableExpansion = (tableName: string) => {
     const newExpanded = new Set(expandedTables);
@@ -45,11 +62,41 @@ export default function TableExplorer({
 
   const handleTableClick = (tableName: string) => {
     setSelectedTable(tableName);
-    onTableSelect?.(tableName);
+
+    if (viewMode === 'data' && onTableClickForData) {
+      // In data view mode, clicking a table loads its data
+      onTableClickForData(tableName);
+    } else if (viewMode === 'structure' && onTableClickForStructure) {
+      // In structure view mode, clicking a table shows its structure
+      onTableClickForStructure(tableName);
+    } else {
+      // In SQL mode, just select the table
+      onTableSelect?.(tableName);
+    }
   };
 
   const handleTableDoubleClick = (tableName: string) => {
     onTableDoubleClick?.(tableName);
+  };
+
+  const handleRemoveClick = (tableName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmModal({ isOpen: true, tableName });
+  };
+
+  const handleConfirmRemove = () => {
+    if (confirmModal.tableName) {
+      onTableRemove?.(confirmModal.tableName);
+      setConfirmModal({ isOpen: false, tableName: '' });
+      // Clear selection if the removed table was selected
+      if (selectedTable === confirmModal.tableName) {
+        setSelectedTable(null);
+      }
+    }
+  };
+
+  const handleCancelRemove = () => {
+    setConfirmModal({ isOpen: false, tableName: '' });
   };
 
   // Get schema information for a specific table
@@ -109,7 +156,12 @@ export default function TableExplorer({
         <div className="p-2">
           {tables.map((tableName) => {
             const isExpanded = expandedTables.has(tableName);
-            const isSelected = selectedTable === tableName;
+            const isSelected =
+              viewMode === 'data'
+                ? selectedTableForData === tableName
+                : viewMode === 'structure'
+                  ? selectedTableForStructure === tableName
+                  : selectedTable === tableName;
 
             return (
               <div key={tableName} className="mb-1">
@@ -172,6 +224,27 @@ export default function TableExplorer({
                   <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-200 text-gray-600 rounded">
                     ∞
                   </span>
+
+                  {/* Remove Button */}
+                  <button
+                    className="ml-2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    onClick={(e) => handleRemoveClick(tableName, e)}
+                    title={`Remove table ${tableName}`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
                 </div>
 
                 {/* Expanded Content (Schema Info) */}
@@ -255,6 +328,18 @@ export default function TableExplorer({
           {tables.length > 0 && <span className="text-green-600">●</span>}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        title="Remove Table"
+        message={`Are you sure you want to remove the table "${confirmModal.tableName}"? This action cannot be undone and all data in this table will be lost.`}
+        confirmText="Remove Table"
+        cancelText="Cancel"
+        onConfirm={handleConfirmRemove}
+        onCancel={handleCancelRemove}
+        type="danger"
+      />
     </div>
   );
 }

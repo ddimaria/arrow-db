@@ -143,6 +143,29 @@ impl ArrowDbWasm {
 
         serde_wasm_bindgen::to_value(&schemas).map_err(|e| JsValue::from_str(&e.to_string()))
     }
+
+    #[wasm_bindgen]
+    pub fn remove_table(&mut self, table_name: String) -> Result<(), JsValue> {
+        set_panic_hook();
+
+        // Log current tables for debugging
+        let current_tables: Vec<String> = self
+            .database
+            .tables
+            .iter()
+            .map(|k| k.key().to_string())
+            .collect();
+        log(&format!("Current tables: {:?}", current_tables));
+        log(&format!("Attempting to remove table: {}", table_name));
+
+        self.database
+            .remove_table(&table_name)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        log(&format!("Successfully removed table: {}", table_name));
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
