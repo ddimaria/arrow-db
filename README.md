@@ -9,10 +9,31 @@ ArrowDB is a teaching tool for learning about the power of Arrow and Arrow tooli
 | Crate                                          | Description                                                         |
 | ---------------------------------------------- | ------------------------------------------------------------------- |
 | [arrow-db-core](arrow-db-core/README.md)       | The core ArrowDB DB.                                                |
-| [arrow-db-server](arrow-db-server/README.md)   | A Tonic server that leverages the Arrow Flight protocol .           |
+| [arrow-db-server](arrow-db-server/README.md)   | A Tonic server that leverages the Arrow Flight protocol.            |
 | [arrow-db-client](arrow-db-client/README.md)   | A Rust client for querying the ArrowDB server.                      |
 | [arrow-db-wasm](arrow-db-wasm/README.md)       | A WebAssembly module for use in the ArrowDB browser.                |
 | [arrow-db-browser](arrow-db-browser/README.md) | A React app for interacting with the ArrowDB server in the browser. |
+
+
+
+## Quick Start
+
+```bash
+# Install dependencies
+make install
+
+# Start development server (builds WASM + starts Vite)
+make dev
+
+# Build everything for production
+make build
+
+# Run all checks (format, lint, test)
+make check
+
+# See all available commands
+make help
+```
 
 ## ArrowDB Fundamentals
 

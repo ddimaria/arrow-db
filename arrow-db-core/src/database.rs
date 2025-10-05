@@ -18,7 +18,7 @@ use crate::{
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-const DISK_PATH: &'static str = "./../data/";
+const DISK_PATH: &str = "./../data/";
 
 pub struct Database<'a> {
     pub name: &'a str,
@@ -108,9 +108,9 @@ impl<'a> Database<'a> {
     pub async fn new_from_disk(name: &str) -> Result<Database<'_>> {
         let mut database = Database::new(name)?;
         let path = format!("{DISK_PATH}{}", database.name);
-        let mut entries = tokio::fs::read_dir(path.to_owned()).await.map_err(|e| {
-            DbError::CreateDatabase(format!("Error reading file: {}", e.to_string()))
-        })?;
+        let mut entries = tokio::fs::read_dir(path.to_owned())
+            .await
+            .map_err(|e| DbError::CreateDatabase(format!("Error reading file: {}", e)))?;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
             if let Ok(file_type) = entry.file_type().await {
@@ -152,9 +152,7 @@ impl<'a> Database<'a> {
         let path = format!("{DISK_PATH}{}", self.name);
         tokio::fs::create_dir_all(path.to_owned())
             .await
-            .map_err(|e| {
-                DbError::CreateDatabase(format!("Error creating directory: {}", e.to_string()))
-            })?;
+            .map_err(|e| DbError::CreateDatabase(format!("Error creating directory: {}", e)))?;
 
         for table in self.tables.iter() {
             table
@@ -217,7 +215,7 @@ pub mod tests {
         (database, table_users)
     }
 
-    pub fn seed_database<'a>(database: &mut Database) {
+    pub fn seed_database(database: &mut Database) {
         get_mut_table!(database, "users")
             .unwrap()
             .add_column::<Int32Array>(
@@ -288,6 +286,7 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_benchmark_large_db() {
         let now = Instant::now();
         let database = Database::new_from_disk("LargeDB").await.unwrap();

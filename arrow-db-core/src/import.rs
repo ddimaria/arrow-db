@@ -71,18 +71,37 @@ impl<'a> Table<'a> {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::test_utils::{create_temp_dir, remove_temp_dir};
     use crate::{database::tests::create_database, get_mut_table, get_table};
 
     #[tokio::test]
     async fn test_import_parquet_from_disk() {
-        let (database, _) = create_database();
+        let (mut database, _) = create_database();
+        crate::database::tests::seed_database(&mut database);
 
+        let temp_dir = create_temp_dir("arrow_db_test_import").await;
+
+        // First export the data to create the files
         get_mut_table!(database, "users")
             .unwrap()
-            .import_parquet_from_disk(database.name)
+            .export_parquet_to_disk(&temp_dir)
+            .await
+            .unwrap();
+
+        // Clear the table data
+        let cleared_table = crate::table::Table::new("users");
+        database.tables.insert("users", cleared_table);
+
+        // Now test importing it
+        get_mut_table!(database, "users")
+            .unwrap()
+            .import_parquet_from_disk(&temp_dir)
             .await
             .unwrap();
 
         get_table!(database, "users").unwrap().print();
+
+        // Clean up
+        remove_temp_dir(&temp_dir).await;
     }
 }
