@@ -3,6 +3,9 @@
 
 ArrowDB is a teaching tool for learning about the power of Arrow and Arrow tooling in the cloud and in the browser.  Rust is used as the primary programming language.
 
+## Demo
+A working demo of the arrow-db-browser can be found at: https://ddimaria.github.io/arrow-db/
+
 <!-- omit in toc -->
 ## Workspace Members
 
