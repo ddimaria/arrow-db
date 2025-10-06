@@ -34,3 +34,15 @@ wasm-bindgen-test = "0.3.43"
 debug-js-glue = true
 demangle-name-section = true
 dwarf-debug-info = false
+
+[profile.release]
+# Optimize for speed of compilation rather than runtime performance in CI
+# This significantly reduces build times
+opt-level = 2          # Use O2 instead of O3 (faster compilation)
+lto = "thin"           # Use thin LTO instead of full LTO (much faster)
+codegen-units = 16     # More codegen units = faster parallel compilation
+
+[profile.release.package."*"]
+# For dependencies, optimize for speed (they don't change often and are cached)
+opt-level = 3
+codegen-units = 1
