@@ -1,6 +1,5 @@
 import 'react-data-grid/lib/styles.css';
-import DataGrid, { Column, RenderCellProps } from 'react-data-grid';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import './../assets/base.css';
 //@ts-ignore
@@ -10,12 +9,7 @@ import FileUpload from './FileUpload';
 import AlertModal from './AlertModal';
 import DataView from './DataView';
 import StructureView from './StructureView';
-
-interface Cell {
-  id: string;
-  title: string[];
-}
-type Row = Cell;
+import SqlView from './SqlView';
 let database: ArrowDbWasm;
 
 // load the database once
@@ -31,13 +25,21 @@ let initPromise = init()
     throw error;
   });
 
+interface PaginationInfo {
+  page: number;
+  page_size: number;
+  rows_in_page: number;
+  total_rows: number | null;
+  total_pages: number | null;
+  has_next_page: boolean;
+  has_previous_page: boolean;
+}
+
 export default function App() {
-  const [output, setOutput] = useState<string[][] | null>(null);
   const [query, setQuery] = useState<string>('');
   const [schemas, setSchemas] = useState<any[] | null>(null);
   const [tables, setTables] = useState<string[]>([]);
   const [isDatabaseReady, setIsDatabaseReady] = useState<boolean>(false);
-  const [isQueryLoading, setIsQueryLoading] = useState<boolean>(false);
   const [isFileLoading, setIsFileLoading] = useState<boolean>(false);
   const [loadingProgress, setLoadingProgress] = useState<{
     current: number;
@@ -57,6 +59,18 @@ export default function App() {
   const [selectedTableForStructure, setSelectedTableForStructure] = useState<
     string | null
   >(null);
+
+  // SQL View state (persisted across view changes)
+  const [sqlOutput, setSqlOutput] = useState<string[][] | null>(null);
+  const [sqlPaginationInfo, setSqlPaginationInfo] =
+    useState<PaginationInfo | null>(null);
+  const [sqlCachedTotalCount, setSqlCachedTotalCount] = useState<{
+    total_rows: number | null;
+    total_pages: number | null;
+  } | null>(null);
+  const [sqlCurrentPage, setSqlCurrentPage] = useState(0);
+  const [sqlPageSize, setSqlPageSize] = useState(100);
+  const [isQueryLoading, setIsQueryLoading] = useState(false);
 
   // Helper functions for alerts
   const showAlert = (
@@ -82,61 +96,6 @@ export default function App() {
       });
   }, []);
 
-  const handleQuery = () => {
-    if (query !== '') {
-      console.log('Executing query:', query);
-      console.log('Database ready:', isDatabaseReady);
-      console.log('Database instance:', database);
-
-      if (!isDatabaseReady || !database) {
-        console.error('Database not ready yet');
-        showAlert(
-          'Database Not Ready',
-          'Database not ready. Please wait a moment and try again.',
-          'warning'
-        );
-        return;
-      }
-
-      // Clear previous results and show loading
-      setOutput(null);
-      setIsQueryLoading(true);
-
-      // Use MessageChannel to defer execution and allow React to render loading state
-      const channel = new MessageChannel();
-      channel.port2.onmessage = () => {
-        database
-          .query(query)
-          .then((results) => {
-            if (results && results[0] && results[0].data) {
-              setOutput(results[0].data);
-            } else {
-              console.error('Unexpected query result format:', results);
-              showAlert(
-                'Query Error',
-                'Query executed but returned unexpected format',
-                'warning'
-              );
-            }
-          })
-          .catch((error) => {
-            console.error('Query error:', error);
-            showAlert(
-              'Query Failed',
-              `Query failed: ${error.message || error}`,
-              'danger'
-            );
-          })
-          .finally(() => {
-            setIsQueryLoading(false);
-          });
-      };
-      channel.port1.postMessage(null);
-    } else {
-      showAlert('No Query', 'Please enter a query', 'info');
-    }
-  };
-
   const handleTableSelect = (tableName: string) => {
     // Optional: Could highlight the selected table or show schema info
     console.log(`Selected table: ${tableName}`);
@@ -160,6 +119,49 @@ export default function App() {
         return results[0].data;
       }
       return [];
+    } catch (error) {
+      console.error('Error querying table:', error);
+      throw error;
+    }
+  };
+
+  const handleQueryTableDataPaginated = async (
+    tableName: string,
+    page: number,
+    pageSize: number,
+    includeTotalCount: boolean = true
+  ): Promise<{ data: string[][]; pagination: PaginationInfo }> => {
+    if (!isDatabaseReady || !database) {
+      throw new Error('Database not ready');
+    }
+
+    try {
+      const result = await database.query_paginated(
+        `SELECT * FROM ${tableName}`,
+        page,
+        pageSize,
+        includeTotalCount
+      );
+
+      if (result && result.data && result.data[0] && result.data[0].data) {
+        return {
+          data: result.data[0].data,
+          pagination: result.pagination
+        };
+      }
+
+      return {
+        data: [],
+        pagination: {
+          page,
+          page_size: pageSize,
+          rows_in_page: 0,
+          total_rows: null,
+          total_pages: null,
+          has_next_page: false,
+          has_previous_page: false
+        }
+      };
     } catch (error) {
       console.error('Error querying table:', error);
       throw error;
@@ -198,9 +200,6 @@ export default function App() {
           setSchemas(filteredSchemas);
         }
 
-        // Clear output if the removed table was being queried
-        setOutput(null);
-
         return;
       }
 
@@ -213,9 +212,6 @@ export default function App() {
 
       setTables(updatedTables);
       setSchemas(updatedSchemas);
-
-      // Clear output if the removed table was being queried
-      setOutput(null);
 
       console.log(`Table ${tableName} removed successfully`);
     } catch (error) {
@@ -289,40 +285,6 @@ export default function App() {
     }
   };
 
-  const columns = useMemo((): readonly Column<any>[] => {
-    let columns: Column<any>[] = [];
-
-    if (output) {
-      columns = output[0].map((header, index) => ({
-        key: String(index),
-        name: header,
-        width: 120,
-        minWidth: 80,
-        resizable: true,
-        renderCell: (props: RenderCellProps<Cell>) =>
-          `${props.row.title[index]}`
-      }));
-    }
-
-    return columns;
-  }, [output]);
-
-  const rows = useMemo((): readonly Row[] => {
-    let rows: Row[] = [];
-
-    if (output) {
-      // Remove the arbitrary row limit - let the grid handle virtualization
-      for (let i = 1; i < output.length; i++) {
-        rows.push({
-          id: String(i),
-          title: output[i]
-        });
-      }
-    }
-
-    return rows;
-  }, [output]);
-
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Top Toolbar */}
@@ -355,7 +317,6 @@ export default function App() {
             onClick={() => {
               setTables([]);
               setSchemas(null);
-              setOutput(null);
               setQuery('');
               setLoadingProgress(null);
             }}
@@ -483,107 +444,25 @@ export default function App() {
 
               {/* SQL Query Panel */}
               {viewMode === 'sql' && (
-                <>
-                  <div className="bg-white border-b border-gray-200 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        SQL Query
-                      </label>
-                      <button
-                        className={`px-4 py-2 text-white text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center space-x-2 ${
-                          isDatabaseReady && !isQueryLoading
-                            ? 'bg-blue-600 hover:bg-blue-700'
-                            : 'bg-gray-400 cursor-not-allowed'
-                        }`}
-                        onClick={handleQuery}
-                        disabled={!isDatabaseReady || isQueryLoading}
-                      >
-                        {isQueryLoading && (
-                          <svg
-                            className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                        )}
-                        <span>
-                          {isQueryLoading
-                            ? 'Running...'
-                            : isDatabaseReady
-                              ? 'Run Query'
-                              : 'Loading...'}
-                        </span>
-                      </button>
-                    </div>
-                    <textarea
-                      className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value || '')}
-                      onKeyDown={(e) => {
-                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                          e.preventDefault();
-                          handleQuery();
-                        }
-                      }}
-                      placeholder="SELECT * FROM table_name (Ctrl+Enter to run)"
-                      disabled={isQueryLoading}
-                    />
-                  </div>
-
-                  {/* Results Grid */}
-                  <div className="flex-1 bg-white overflow-hidden relative">
-                    {/* Grid Content */}
-                    {output ? (
-                      <DataGrid
-                        columns={columns}
-                        rows={rows}
-                        rowHeight={32}
-                        className="fill-grid"
-                        direction="ltr"
-                        enableVirtualization={true}
-                        rowKeyGetter={(row) => row.id}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        <div className="text-center">
-                          <svg
-                            className="mx-auto h-12 w-12 text-gray-400 mb-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
-                          <p className="text-lg font-medium text-gray-900 mb-1">
-                            No query results
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            Run a SQL query to see results here
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
+                <SqlView
+                  database={database}
+                  isDatabaseReady={isDatabaseReady}
+                  query={query}
+                  onQueryChange={setQuery}
+                  onShowAlert={showAlert}
+                  output={sqlOutput}
+                  setOutput={setSqlOutput}
+                  paginationInfo={sqlPaginationInfo}
+                  setPaginationInfo={setSqlPaginationInfo}
+                  cachedTotalCount={sqlCachedTotalCount}
+                  setCachedTotalCount={setSqlCachedTotalCount}
+                  currentPage={sqlCurrentPage}
+                  setCurrentPage={setSqlCurrentPage}
+                  pageSize={sqlPageSize}
+                  setPageSize={setSqlPageSize}
+                  isQueryLoading={isQueryLoading}
+                  setIsQueryLoading={setIsQueryLoading}
+                />
               )}
 
               {/* Data View */}
@@ -593,6 +472,7 @@ export default function App() {
                   selectedTable={selectedTableForData}
                   onTableSelect={setSelectedTableForData}
                   onQueryTable={handleQueryTableData}
+                  onQueryTablePaginated={handleQueryTableDataPaginated}
                   isDatabaseReady={isDatabaseReady}
                 />
               )}
@@ -610,7 +490,7 @@ export default function App() {
       </div>
 
       {/* Portal-based Loading Overlay */}
-      {(isQueryLoading || isFileLoading) &&
+      {isFileLoading &&
         createPortal(
           <div
             style={{
@@ -645,12 +525,10 @@ export default function App() {
                   margin: '0 0 8px'
                 }}
               >
-                {isFileLoading ? 'Loading File...' : 'Running Query...'}
+                Loading File...
               </h3>
               <p style={{ fontSize: '14px', margin: 0, opacity: 0.8 }}>
-                {isFileLoading
-                  ? 'Please wait while we process your file'
-                  : 'Please wait while we process your query'}
+                Please wait while we process your file
               </p>
             </div>
           </div>,

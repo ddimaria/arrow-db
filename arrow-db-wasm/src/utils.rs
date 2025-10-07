@@ -29,6 +29,25 @@ pub struct TableSchema {
     pub fields: Vec<SchemaField>,
 }
 
+/// Paginated query result for WASM
+#[derive(Serialize, Deserialize)]
+pub struct PaginatedResult {
+    pub data: Vec<SerializableRecordBatch>,
+    pub pagination: PaginationMetadata,
+}
+
+/// Pagination metadata for WASM
+#[derive(Serialize, Deserialize)]
+pub struct PaginationMetadata {
+    pub page: usize,
+    pub page_size: usize,
+    pub rows_in_page: usize,
+    pub total_rows: Option<usize>,
+    pub total_pages: Option<usize>,
+    pub has_next_page: bool,
+    pub has_previous_page: bool,
+}
+
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then

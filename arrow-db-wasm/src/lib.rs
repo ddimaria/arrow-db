@@ -5,7 +5,9 @@ use bytes::Bytes;
 use chrono::Utc;
 use utils::set_panic_hook;
 use utils::to_serializable;
-use utils::{SchemaField, SerializableRecordBatch, TableSchema};
+use utils::{
+    PaginatedResult, PaginationMetadata, SchemaField, SerializableRecordBatch, TableSchema,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
@@ -104,6 +106,60 @@ impl ArrowDbWasm {
         log(&format!("Total Time: {:.2?}", elapsed));
 
         Ok(serde_wasm_bindgen::to_value(&serializable_record_batches).unwrap())
+    }
+
+    #[wasm_bindgen]
+    pub async fn query_paginated(
+        &self,
+        sql: String,
+        page: usize,
+        page_size: usize,
+        include_total_count: bool,
+    ) -> Result<JsValue, JsValue> {
+        set_panic_hook();
+
+        let total = Utc::now();
+        log(&format!(
+            "Starting paginated query - page: {}, page_size: {}, count: {}",
+            page, page_size, include_total_count
+        ));
+
+        let (data_frame, pagination_info) = self
+            .database
+            .query_paginated(&sql, page, page_size, include_total_count)
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        let elapsed = Utc::now() - total;
+        log(&format!("Paginated query executed in {:.2?}", elapsed));
+
+        let headers = data_frame.schema().clone().strip_qualifiers().field_names();
+        let record_batches = data_frame.collect().await.map_err(|e| e.to_string())?;
+
+        let serializable_record_batches = record_batches
+            .iter()
+            .map(|batch| to_serializable(&headers, batch))
+            .collect::<Vec<SerializableRecordBatch>>();
+
+        let pagination_metadata = PaginationMetadata {
+            page: pagination_info.page,
+            page_size: pagination_info.page_size,
+            rows_in_page: pagination_info.rows_in_page,
+            total_rows: pagination_info.total_rows,
+            total_pages: pagination_info.total_pages,
+            has_next_page: pagination_info.has_next_page,
+            has_previous_page: pagination_info.has_previous_page,
+        };
+
+        let result = PaginatedResult {
+            data: serializable_record_batches,
+            pagination: pagination_metadata,
+        };
+
+        let elapsed = Utc::now() - total;
+        log(&format!("Total paginated query time: {:.2?}", elapsed));
+
+        Ok(serde_wasm_bindgen::to_value(&result).unwrap())
     }
 
     #[wasm_bindgen]
