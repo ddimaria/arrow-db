@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import SqlEditor from './SqlEditor';
 import PaginatedDataGrid from './PaginatedDataGrid';
 //@ts-ignore
 import type { ArrowDbWasm } from './../../arrow-db-wasm';
@@ -13,6 +14,17 @@ interface PaginationInfo {
   has_previous_page: boolean;
 }
 
+interface SchemaField {
+  name: string;
+  data_type: string;
+  nullable: boolean;
+}
+
+interface TableSchema {
+  table_name: string;
+  fields: SchemaField[];
+}
+
 interface SqlViewProps {
   database: ArrowDbWasm;
   isDatabaseReady: boolean;
@@ -23,6 +35,7 @@ interface SqlViewProps {
     message: string,
     type: 'danger' | 'warning' | 'info' | 'success'
   ) => void;
+  schemas: TableSchema[] | null;
   // State managed in App.tsx for persistence
   output: string[][] | null;
   setOutput: (output: string[][] | null) => void;
@@ -49,6 +62,7 @@ export default function SqlView({
   query,
   onQueryChange,
   onShowAlert,
+  schemas,
   output,
   setOutput,
   paginationInfo,
@@ -210,18 +224,13 @@ export default function SqlView({
             </span>
           </button>
         </div>
-        <textarea
-          className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        <SqlEditor
           value={query}
-          onChange={(e) => onQueryChange(e.target.value || '')}
-          onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-              e.preventDefault();
-              handleQuery(true);
-            }
-          }}
-          placeholder="SELECT * FROM table_name (Ctrl+Enter to run)"
-          disabled={isQueryLoading}
+          onChange={onQueryChange}
+          schemas={schemas}
+          isLoading={isQueryLoading}
+          isDatabaseReady={isDatabaseReady}
+          onRunQuery={() => handleQuery(true)}
         />
       </div>
 

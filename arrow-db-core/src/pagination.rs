@@ -31,7 +31,7 @@ impl PaginationInfo {
         rows_in_page: usize,
         total_rows: Option<usize>,
     ) -> Self {
-        let total_pages = total_rows.map(|total| (total + page_size - 1) / page_size);
+        let total_pages = total_rows.map(|total| total.div_ceil(page_size));
         let has_next_page = match total_rows {
             Some(total) => (page + 1) * page_size < total,
             None => rows_in_page == page_size, // If we got a full page, assume there might be more

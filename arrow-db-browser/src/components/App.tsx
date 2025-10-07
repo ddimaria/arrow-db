@@ -59,6 +59,7 @@ export default function App() {
   const [selectedTableForStructure, setSelectedTableForStructure] = useState<
     string | null
   >(null);
+  const [showFileUpload, setShowFileUpload] = useState<boolean>(false);
 
   // SQL View state (persisted across view changes)
   const [sqlOutput, setSqlOutput] = useState<string[][] | null>(null);
@@ -103,7 +104,8 @@ export default function App() {
 
   const handleTableDoubleClick = (tableName: string) => {
     console.log('Double-clicked table:', tableName);
-    setQuery(`SELECT * FROM ${tableName}`);
+    setQuery(`SELECT * FROM "${tableName}"
+LIMIT 1000`);
   };
 
   const handleQueryTableData = async (
@@ -114,7 +116,7 @@ export default function App() {
     }
 
     try {
-      const results = await database.query(`SELECT * FROM ${tableName}`);
+      const results = await database.query(`SELECT * FROM "${tableName}"`);
       if (results && results[0] && results[0].data) {
         return results[0].data;
       }
@@ -137,7 +139,7 @@ export default function App() {
 
     try {
       const result = await database.query_paginated(
-        `SELECT * FROM ${tableName}`,
+        `SELECT * FROM "${tableName}"`,
         page,
         pageSize,
         includeTotalCount
@@ -314,22 +316,17 @@ export default function App() {
         </div>
         {tables.length > 0 && (
           <button
-            onClick={() => {
-              setTables([]);
-              setSchemas(null);
-              setQuery('');
-              setLoadingProgress(null);
-            }}
+            onClick={() => setShowFileUpload(true)}
             className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1 rounded-md hover:bg-gray-100"
           >
-            Load New File
+            Add More Tables
           </button>
         )}
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
-        {tables.length === 0 ? (
+        {tables.length === 0 || showFileUpload ? (
           /* File Upload Screen */
           <div className="flex-1 flex items-center justify-center bg-gray-50">
             <FileUpload
@@ -338,6 +335,10 @@ export default function App() {
               disabled={!isDatabaseReady}
               loadingProgress={loadingProgress || undefined}
               onShowAlert={showAlert}
+              onClose={
+                tables.length > 0 ? () => setShowFileUpload(false) : undefined
+              }
+              hasExistingTables={tables.length > 0}
             />
           </div>
         ) : (
@@ -450,6 +451,7 @@ export default function App() {
                   query={query}
                   onQueryChange={setQuery}
                   onShowAlert={showAlert}
+                  schemas={schemas}
                   output={sqlOutput}
                   setOutput={setSqlOutput}
                   paginationInfo={sqlPaginationInfo}

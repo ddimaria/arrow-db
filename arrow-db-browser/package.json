@@ -21,6 +21,7 @@
     "build:wasm:release": "wasm-pack build ./../arrow-db-wasm --target web --out-dir ../arrow-db-browser/arrow-db-wasm"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "react": "^18.3.1",
     "react-data-grid": "7.0.0-beta.47",
     "react-dom": "^18.3.1"
